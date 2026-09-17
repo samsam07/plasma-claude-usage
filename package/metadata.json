@@ -1,0 +1,26 @@
+{
+    "KPackageStructure": "Plasma/Applet",
+    "KPlugin": {
+        "Authors": [
+            {
+                "Email": "codingsamsam@gmail.com",
+                "Name": "Hisham Maudarbocus"
+            }
+        ],
+        "BugReportUrl": "https://github.com/samsam07/plasma-claude-usage/issues",
+        "Category": "Online Services",
+        "Description": "How much of your Claude plan's session and weekly limits you have used",
+        "EnabledByDefault": true,
+        "Icon": "com.github.samsam07.claudeusage",
+        "Id": "com.github.samsam07.claudeusage",
+        "License": "MIT",
+        "Name": "Claude Usage",
+        "Version": "1.0",
+        "Website": "https://github.com/samsam07/plasma-claude-usage"
+    },
+    "X-Plasma-API": "declarativeappletscript",
+    "X-Plasma-API-Minimum-Version": "6.0",
+    "X-Plasma-MainScript": "ui/main.qml",
+    "X-Plasma-NotificationArea": "true",
+    "X-Plasma-NotificationAreaCategory": "ApplicationStatus"
+}

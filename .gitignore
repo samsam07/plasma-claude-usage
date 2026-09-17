@@ -1,0 +1,16 @@
+# Packaged plasmoid, produced by `kpackagetool6 --package`
+*.plasmoid
+*.tar.gz
+*.zip
+
+# Scratch output from tests/try-run.sh and manual runs
+*.log
+shot*.png
+
+# Editor and desktop cruft
+.idea/
+.vscode/
+*.kate-swp
+*.swp
+*~
+.DS_Store

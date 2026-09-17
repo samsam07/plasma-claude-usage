@@ -1,0 +1,43 @@
+<?xml version="1.0" encoding="utf-8"?>
+<kcfg xmlns="http://www.kde.org/standards/kcfg/1.0"
+      xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+      xsi:schemaLocation="http://www.kde.org/standards/kcfg/1.0
+                          http://www.kde.org/standards/kcfg/1.0/kcfg.xsd">
+  <kcfgfile name=""/>
+  <group name="General">
+
+    <entry name="ringLimit" type="String">
+      <label>Limit the ring shows: session, weekly or closest</label>
+      <default>session</default>
+    </entry>
+
+    <entry name="warningPercent" type="Int">
+      <label>Percentage at which the ring turns yellow</label>
+      <default>75</default>
+      <min>1</min>
+      <max>100</max>
+    </entry>
+
+    <entry name="criticalPercent" type="Int">
+      <label>Percentage at which the ring turns red</label>
+      <default>90</default>
+      <min>1</min>
+      <max>100</max>
+    </entry>
+
+    <entry name="refreshMinutes" type="Int">
+      <label>Minutes between refreshes</label>
+      <!-- The endpoint is rate limited, and the limit is shared with Claude
+           Code's own /usage; polling every minute or two trips it. -->
+      <default>5</default>
+      <min>2</min>
+      <max>60</max>
+    </entry>
+
+    <entry name="credentialsPath" type="String">
+      <label>Claude Code credentials file</label>
+      <default>~/.claude/.credentials.json</default>
+    </entry>
+
+  </group>
+</kcfg>
