@@ -20,6 +20,15 @@ MouseArea {
 
     readonly property var row: applet.ring
 
+    // About half the ring, but odd when the ring is odd and even when it is
+    // even: otherwise centring it lands on half a pixel, which is rounded,
+    // and the mark sits half a pixel up and to the left.
+    readonly property int markSize: {
+        var ring = Math.round(Math.min(width, height));
+        var size = Math.round(ring * 0.52);
+        return (ring - size) % 2 === 0 ? size : size + 1;
+    }
+
     // Square, sized by the panel's thickness.
     Layout.minimumWidth: Plasmoid.formFactor === PlasmaCore.Types.Horizontal ? height : Kirigami.Units.iconSizes.small
     Layout.minimumHeight: Plasmoid.formFactor === PlasmaCore.Types.Vertical ? width : Kirigami.Units.iconSizes.small
@@ -54,7 +63,7 @@ MouseArea {
         Kirigami.Icon {
             id: logo
             anchors.centerIn: parent
-            width: Math.round(parent.diameter * 0.52)
+            width: compact.markSize
             height: width
             source: Qt.resolvedUrl("../icons/claude.svg")
             opacity: compact.applet.hasData ? 1 : 0.6
