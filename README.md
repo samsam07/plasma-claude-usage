@@ -2,6 +2,8 @@
 
 [github.com/samsam07/plasma-claude-usage](https://github.com/samsam07/plasma-claude-usage)
 
+![The popup with the hourly heatmap, with each session's peak as bars instead, and in a wide window with two columns](docs/popup.png)
+
 Shows how much of your Claude plan's limits you have used, as a ring around the
 Claude mark in the system tray, next to the network and volume icons. Click it
 for the current session with its pace, this week's limits, this week's usage
