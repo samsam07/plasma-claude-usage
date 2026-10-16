@@ -271,8 +271,12 @@ PlasmoidItem {
         sessionReader.connectSource(sessionsCommand);
     }
 
-    // The popup lists the three most recently active: working ones first.
-    readonly property var recentSessions: sessions.slice(0, 3)
+    // What the popup lists: working ones first, then the most recently active,
+    // or only the working ones, up to the number chosen in the settings.
+    readonly property var recentSessions: (Plasmoid.configuration.sessionsBusyOnly
+            ? sessions.filter(session => session.status === "busy")
+            : sessions)
+        .slice(0, Math.max(1, Plasmoid.configuration.sessionCount))
     // The panel's Claude mark animates while any session is working.
     readonly property bool anyBusy: sessions.some(session => session.status === "busy")
 

@@ -69,7 +69,7 @@ MouseArea {
             width: logo.width
             height: logo.height
             size: logo.width
-            visible: compact.applet.anyBusy
+            visible: compact.applet.anyBusy && Plasmoid.configuration.animateLogo
             running: visible
         }
     }

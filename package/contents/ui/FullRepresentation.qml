@@ -12,6 +12,7 @@ import QtQuick.Layouts
 import org.kde.kirigami as Kirigami
 import org.kde.plasma.components as PlasmaComponents3
 import org.kde.plasma.extras as PlasmaExtras
+import org.kde.plasma.plasmoid
 
 import "../code/usage.js" as Usage
 
@@ -27,13 +28,14 @@ PlasmaExtras.Representation {
         ? applet.colorFor(hero.level, Kirigami.Theme.backgroundColor)
         : Kirigami.Theme.disabledTextColor
 
-    // Which sections have something to show. A separator goes above each one
-    // that has another above it.
-    readonly property bool showHero: hero !== null
-    readonly property bool showLimits: others.length > 0 || applet.credits !== null
-    readonly property bool showProducts: applet.breakdown !== null
-    readonly property bool showSessions: true
-    readonly property bool showTrend: applet.hasData
+    // Which sections are on screen: switched on in the settings, and with
+    // something to show. A separator goes above each one that has another above it.
+    readonly property var cfg: Plasmoid.configuration
+    readonly property bool showHero: cfg.showMainLimit && hero !== null
+    readonly property bool showLimits: cfg.showOtherLimits && (others.length > 0 || applet.credits !== null)
+    readonly property bool showProducts: cfg.showProducts && applet.breakdown !== null
+    readonly property bool showSessions: cfg.showSessions
+    readonly property bool showTrend: cfg.showTrend && applet.hasData
 
     Layout.minimumWidth: Kirigami.Units.gridUnit * 18
     Layout.preferredWidth: Kirigami.Units.gridUnit * 20
@@ -318,7 +320,9 @@ PlasmaExtras.Representation {
 
                     PlasmaComponents3.Label {
                         Layout.fillWidth: true
-                        text: i18n("Recent Claude Code sessions")
+                        text: full.cfg.sessionsBusyOnly
+                            ? i18n("Running Claude Code sessions")
+                            : i18n("Recent Claude Code sessions")
                         font.weight: Font.DemiBold
                         elide: Text.ElideRight
                     }
@@ -326,7 +330,9 @@ PlasmaExtras.Representation {
                     PlasmaComponents3.Label {
                         Layout.fillWidth: true
                         visible: full.applet.recentSessions.length === 0
-                        text: i18n("No Claude Code sessions open")
+                        text: full.cfg.sessionsBusyOnly
+                            ? i18n("None running")
+                            : i18n("No Claude Code sessions open")
                         color: Kirigami.Theme.disabledTextColor
                     }
 
@@ -413,6 +419,18 @@ PlasmaExtras.Representation {
                 display: PlasmaComponents3.AbstractButton.IconOnly
                 text: i18n("Open Usage on claude.ai")
                 onClicked: Qt.openUrlExternally(full.applet.usagePage)
+
+                PlasmaComponents3.ToolTip.text: text
+                PlasmaComponents3.ToolTip.visible: hovered
+                PlasmaComponents3.ToolTip.delay: Kirigami.Units.toolTipDelay
+            }
+
+            PlasmaComponents3.ToolButton {
+                visible: full.cfg.showSettingsButton
+                icon.name: "configure-symbolic"
+                display: PlasmaComponents3.AbstractButton.IconOnly
+                text: i18n("Configure Claude Usage…")
+                onClicked: Plasmoid.internalAction("configure").trigger()
 
                 PlasmaComponents3.ToolTip.text: text
                 PlasmaComponents3.ToolTip.visible: hovered
