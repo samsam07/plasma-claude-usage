@@ -765,4 +765,13 @@ PlasmoidItem {
         scheduleTick();
         refresh();
     }
+
+    // A request still out when the widget goes (removed, or reloaded after an
+    // update) would otherwise answer into an object that no longer exists.
+    Component.onDestruction: {
+        if (pending) {
+            pending.onreadystatechange = null;
+            pending.abort();
+        }
+    }
 }
