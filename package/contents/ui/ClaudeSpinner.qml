@@ -1,7 +1,8 @@
 /*
  * The spark Claude Code cycles through while it works — · ✢ ✳ ✶ ✻ ✽ and back
- * — in Claude orange. Holds still on its fullest frame when Plasma's
- * animations are switched off.
+ * — in Claude orange. It keeps cycling even with Plasma's animations set to
+ * Instant, as Plasma's own busy indicators do: it says work is under way. The
+ * widget's own setting is what turns it off.
  *
  * Drawn rather than set as text: the glyphs come from different fonts that
  * report their extents unreliably, so as text they could not be kept centred
@@ -24,8 +25,7 @@ Canvas {
     readonly property var frames: [0, 1, 2, 3, 4, 5, 4, 3, 2, 1]
     property int frame: 0
 
-    // Plasma never reports a duration under 1 ms, so 1 is what "off" reads as.
-    readonly property bool animating: running && visible && Kirigami.Units.longDuration > 1
+    readonly property bool animating: running && visible
     // Standing still, the dot would be all but invisible; show the full spark.
     readonly property int shape: animating ? frames[frame] : 5
 
@@ -115,7 +115,8 @@ Canvas {
     }
 
     Timer {
-        interval: 120
+        // A full cycle in 3.75 s: calm enough to sit in the panel all day.
+        interval: 375
         repeat: true
         running: spinner.animating
         onTriggered: spinner.frame = (spinner.frame + 1) % spinner.frames.length

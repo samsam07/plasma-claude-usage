@@ -82,8 +82,9 @@ they don't look like the limit bars' orange, yellow and red.
 The Claude Code sessions open on this computer, working ones first, then the
 most recently active, each with its name, project folder and how long it has
 been running. While any of them is working, the panel icon becomes the spark
-Claude Code shows while it works. With Plasma's animations switched off, the
-spark holds still.
+Claude Code shows while it works. Like Plasma's own busy indicators, it keeps
+moving with Plasma's animations set to Instant; switch it off in the
+widget's settings instead.
 
 They come from the files Claude Code keeps in `~/.claude/sessions`, one per
 process. A file only counts while its process is alive and started when the
