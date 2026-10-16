@@ -273,13 +273,15 @@ PlasmoidItem {
 
     // The popup lists the three most recently active: working ones first.
     readonly property var recentSessions: sessions.slice(0, 3)
+    // The panel's Claude mark animates while any session is working.
+    readonly property bool anyBusy: sessions.some(session => session.status === "busy")
 
-    // Sessions come and go and switch between busy and idle, so keep up while
-    // the popup is open.
+    // Sessions come and go and switch between busy and idle. The panel icon
+    // follows them too, so keep reading while closed, just less often.
     Timer {
-        interval: 3000
+        interval: root.expanded ? 3000 : 10000
         repeat: true
-        running: root.expanded
+        running: true
         triggeredOnStart: true
         onTriggered: root.readSessions()
     }
