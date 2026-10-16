@@ -122,6 +122,11 @@ hence the 5-minute default. When the service answers `429`, the widget keeps
 its figures and waits at least 5 minutes, doubling up to 30, before trying
 again. The service's `retry-after` header says `0`, so it isn't useful.
 
+Restarting Plasma doesn't reset that wait: the widget saves it and waits it
+out after a restart. Nor does a restart fetch straight away when the saved
+figures are less than one refresh old. They are shown as they are, and the
+next fetch comes when they are due.
+
 ### Colours
 
 These are Claude Code's own theme colours. It ships separate sets for dark and

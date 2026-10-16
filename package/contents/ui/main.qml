@@ -45,6 +45,13 @@ PlasmoidItem {
     // Grows on consecutive failures; cleared by the next success.
     property int retryDelay: 0
 
+    // Until when the service asked not to be asked again; kept across
+    // restarts, and 0 once a fetch succeeds.
+    property double backoffUntil: 0
+
+    // Until the first sign-in read after the widget starts.
+    property bool starting: true
+
     // The clock the bindings below are evaluated against; advanced each minute.
     property double now: Date.now()
 
@@ -246,6 +253,36 @@ PlasmoidItem {
         }
     }
 
+    function readBackoff() {
+        var backoff = { notBefore: 0, delay: 0 };
+        try {
+            database().transaction(function (tx) {
+                tx.executeSql("CREATE TABLE IF NOT EXISTS backoff (account TEXT PRIMARY KEY, notBefore REAL, delay REAL)");
+                var rs = tx.executeSql("SELECT notBefore, delay FROM backoff WHERE account = ?", [account]);
+                if (rs.rows.length > 0) {
+                    backoff.notBefore = rs.rows.item(0).notBefore;
+                    backoff.delay = rs.rows.item(0).delay;
+                }
+            });
+        } catch (e) {
+            console.warn("claudeusage: could not read backoff:", e);
+        }
+        return backoff;
+    }
+
+    function writeBackoff(notBefore, delay) {
+        backoffUntil = notBefore;
+        try {
+            database().transaction(function (tx) {
+                tx.executeSql("CREATE TABLE IF NOT EXISTS backoff (account TEXT PRIMARY KEY, notBefore REAL, delay REAL)");
+                tx.executeSql("INSERT OR REPLACE INTO backoff (account, notBefore, delay) VALUES (?, ?, ?)",
+                              [account, notBefore, delay]);
+            });
+        } catch (e) {
+            console.warn("claudeusage: could not write backoff:", e);
+        }
+    }
+
     // ------------------------------------------------------------- sessions
 
     // Running Claude Code sessions; see Usage.parseSessions() for the format.
@@ -352,6 +389,8 @@ PlasmoidItem {
     }
 
     function credentialsRead(exitCode, stdout) {
+        var first = starting;
+        starting = false;
         var credentials = null;
         if (exitCode === 0) {
             try {
@@ -390,8 +429,40 @@ PlasmoidItem {
             return;
         }
 
+        if (first && deferStartupFetch()) {
+            loading = false;
+            return;
+        }
+
         token = credentials.accessToken;
         fetchUsage();
+    }
+
+    /*
+     * Right after a start, figures cached less than a refresh ago are shown as
+     * they are, and a slow-down the service asked for before the restart is
+     * still waited out. Restarting plasmashell a few times in a row would
+     * otherwise trip the rate limit, which Claude Code's own /usage shares.
+     * Says whether the fetch was put off.
+     */
+    function deferStartupFetch() {
+        var backoff = readBackoff();
+        var now = Date.now();
+        backoffUntil = backoff.notBefore;
+        if (backoff.notBefore > now) {
+            retryDelay = backoff.delay;
+            errorText = i18n("The usage service asked to slow down");
+            markStale();
+            retry.interval = backoff.notBefore - now;
+            retry.restart();
+            return true;
+        }
+        if (hasData && now - lastFetch < poll.interval) {
+            firstFetch.interval = lastFetch + poll.interval - now;
+            firstFetch.restart();
+            return true;
+        }
+        return false;
     }
 
     // --------------------------------------------------------------- network
@@ -422,6 +493,13 @@ PlasmoidItem {
                     errorText = "";
                     retry.stop();
                     retryDelay = 0;
+                    if (backoffUntil > 0) {
+                        writeBackoff(0, 0);
+                    }
+                    // The next poll a full interval from now, however this
+                    // fetch came about.
+                    firstFetch.stop();
+                    poll.restart();
                 } catch (e) {
                     reportFailure(i18n("Could not read the usage response"), 0);
                 }
@@ -441,6 +519,7 @@ PlasmoidItem {
                 var seconds = parseInt(request.getResponseHeader("retry-after"), 10);
                 var wait = seconds > 0 ? seconds * 1000 : Math.max(300000, retryDelay * 2);
                 reportFailure(i18n("The usage service asked to slow down"), Math.min(wait, 1800000));
+                writeBackoff(Date.now() + retryDelay, retryDelay);
             } else if (request.status === 0) {
                 reportFailure(i18n("Could not reach the usage service"), 0);
             } else {
@@ -530,6 +609,17 @@ PlasmoidItem {
         onTriggered: root.refresh()
     }
 
+    // When figures cached before a restart fall due; see deferStartupFetch().
+    Timer {
+        id: firstFetch
+        repeat: false
+        onTriggered: {
+            if (!retry.running) {
+                root.refresh();
+            }
+        }
+    }
+
     Timer {
         id: watchdog
         interval: 20000
@@ -568,7 +658,9 @@ PlasmoidItem {
         stale = false;
         lastFetch = 0;
         retryDelay = 0;
+        backoffUntil = 0;
         retry.stop();
+        firstFetch.stop();
         refresh();
         // The sessions move with the config directory.
         sessions = [];
