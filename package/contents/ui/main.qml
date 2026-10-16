@@ -243,6 +243,47 @@ PlasmoidItem {
         }
     }
 
+    // ------------------------------------------------------------- sessions
+
+    // Running Claude Code sessions; see Usage.parseSessions() for the format.
+    property var sessions: []
+
+    P5Support.DataSource {
+        id: sessionReader
+        engine: "executable"
+        connectedSources: []
+        onNewData: (source, data) => {
+            disconnectSource(source);
+            root.now = Date.now();
+            root.sessions = Usage.parseSessions(data.stdout);
+        }
+    }
+
+    // Field 22 of /proc/<pid>/stat is the start time Claude Code records as
+    // procStart; the process name before it may hold spaces, so cut after ") ".
+    readonly property string sessionsCommand:
+        "printf '%s\\036' \"$HOME\"; cd \"$HOME/.claude/sessions\" 2>/dev/null || exit 0; "
+        + "for f in *.json; do [ -f \"$f\" ] || continue; p=${f%.json}; "
+        + "s=$(sed 's/.*) //' \"/proc/$p/stat\" 2>/dev/null | cut -d' ' -f20); "
+        + "[ -n \"$s\" ] || continue; printf '%s\\037' \"$s\"; cat -- \"$f\"; printf '\\036'; done"
+
+    function readSessions() {
+        sessionReader.connectSource(sessionsCommand);
+    }
+
+    // The popup lists the three most recently active: working ones first.
+    readonly property var recentSessions: sessions.slice(0, 3)
+
+    // Sessions come and go and switch between busy and idle, so keep up while
+    // the popup is open.
+    Timer {
+        interval: 3000
+        repeat: true
+        running: root.expanded
+        triggeredOnStart: true
+        onTriggered: root.readSessions()
+    }
+
     // ---------------------------------------------------------- credentials
 
     // Claude Code rewrites the file whenever it renews the sign-in, so it is
@@ -478,6 +519,9 @@ PlasmoidItem {
 
     onExpandedChanged: {
         root.now = Date.now();
+        if (root.expanded) {
+            root.readSessions();
+        }
         // Opening the popup is when fresh figures matter most — but not at the
         // cost of tripping the rate limit again.
         if (root.expanded && !retry.running && Date.now() - root.lastFetch > 60000) {

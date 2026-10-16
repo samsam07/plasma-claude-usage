@@ -183,6 +183,29 @@ check("whole hours", formatDuration(3 * 3600000), "3 h");
 check("days", formatDuration((3 * 24 + 4) * 3600000), "3 d 4 h");
 check("custom units", formatDuration(90 * 60000, { day: "j", hour: "h", minute: "mn" }), "1 h 30 mn");
 
+print("\nsessions");
+{
+    const RS = "\x1e", US = "\x1f";
+    const entry = (start, json) => start + US + JSON.stringify(json) + RS;
+    const text = "/home/me" + RS
+        + entry("100", { sessionId: "a", procStart: "100", cwd: "/home/me/projects/app", name: "Fix bug", startedAt: 1000, statusUpdatedAt: 5000, status: "idle" })
+        + entry("200", { sessionId: "b", procStart: "200", cwd: "/home/me/projects/web", startedAt: 500, status: "busy" })
+        + entry("999", { sessionId: "c", procStart: "300", cwd: "/tmp", name: "Reused pid", startedAt: 2000, status: "busy" })
+        + entry("400", { sessionId: "d", procStart: "400", cwd: "/srv/data", name: "Newest", startedAt: 3000, statusUpdatedAt: 4000, status: "idle" })
+        + "400" + US + "{broken" + RS;
+    const list = parseSessions(text);
+    check("drops reused pids and broken files", list.length, 3);
+    check("busy first", list[0].id, "b");
+    check("then most recently active", list.map(s => s.id).join(","), "b,a,d");
+    check("unnamed falls back to folder", list[0].name, "web");
+    check("home shortened", list[0].folder, "~/projects/web");
+    check("outside home kept", list[2].folder, "/srv/data");
+    check("status kept", list[1].status, "idle");
+    check("last active falls back to start", list[0].lastActive, 500);
+    check("nothing running", parseSessions("/home/me" + RS).length, 0);
+    check("no output", parseSessions("").length, 0);
+}
+
 print("\n" + (failures ? "FAILED " + failures + " of " + checks : "all " + checks + " checks passed"));
 if (failures) {
     imports.system.exit(1);
