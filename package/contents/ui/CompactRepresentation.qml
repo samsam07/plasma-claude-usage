@@ -69,6 +69,7 @@ MouseArea {
             width: logo.width
             height: logo.height
             size: logo.width
+            color: compact.applet.colorFor("normal", Kirigami.Theme.backgroundColor)
             visible: compact.applet.anyBusy && Plasmoid.configuration.animateLogo
             running: visible
         }

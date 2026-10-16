@@ -23,7 +23,8 @@ PlasmaExtras.Representation {
     required property var applet
 
     readonly property var hero: applet.ring
-    readonly property var others: applet.rows.filter(row => !hero || row.key !== hero.key)
+    // With the ring's limit hidden, it is listed with the others instead.
+    readonly property var others: applet.rows.filter(row => !showHero || row.key !== hero.key)
     readonly property color heroColor: hero
         ? applet.colorFor(hero.level, Kirigami.Theme.backgroundColor)
         : Kirigami.Theme.disabledTextColor
@@ -36,6 +37,14 @@ PlasmaExtras.Representation {
     readonly property bool showProducts: cfg.showProducts && applet.breakdown !== null
     readonly property bool showSessions: cfg.showSessions
     readonly property bool showTrend: cfg.showTrend && applet.hasData
+    // Without data the sign-in message comes first; every later section gets a
+    // separator above it.
+    readonly property string firstSection: !applet.hasData ? "placeholder"
+        : showHero ? "hero"
+        : showLimits ? "limits"
+        : showProducts ? "products"
+        : showSessions ? "sessions"
+        : "trend"
 
     Layout.minimumWidth: Kirigami.Units.gridUnit * 18
     Layout.preferredWidth: Kirigami.Units.gridUnit * 20
@@ -114,7 +123,8 @@ PlasmaExtras.Representation {
                 anchors.rightMargin: Kirigami.Units.largeSpacing * 2
                 spacing: Kirigami.Units.largeSpacing
 
-                // Nothing cached and nothing fetched — say why, and offer a way forward.
+                // Nothing cached and nothing fetched — say why. The footer's
+                // Refresh button is the way forward, so it is not repeated here.
                 PlasmaExtras.PlaceholderMessage {
                     id: placeholder
                     Layout.fillWidth: true
@@ -225,7 +235,7 @@ PlasmaExtras.Representation {
 
                 Kirigami.Separator {
                     Layout.fillWidth: true
-                    visible: full.showLimits && full.showHero
+                    visible: full.showLimits && full.firstSection !== "limits"
                 }
 
                 // ---------------------------------------------------- others
@@ -278,7 +288,7 @@ PlasmaExtras.Representation {
 
                 Kirigami.Separator {
                     Layout.fillWidth: true
-                    visible: full.showProducts && (full.showHero || full.showLimits)
+                    visible: full.showProducts && full.firstSection !== "products"
                 }
 
                 ColumnLayout {
@@ -309,8 +319,7 @@ PlasmaExtras.Representation {
 
                 Kirigami.Separator {
                     Layout.fillWidth: true
-                    visible: full.showSessions
-                        && (!full.applet.hasData || full.showHero || full.showLimits || full.showProducts)
+                    visible: full.showSessions && full.firstSection !== "sessions"
                 }
 
                 ColumnLayout {
@@ -345,6 +354,8 @@ PlasmaExtras.Representation {
                             name: modelData.name
                             folder: modelData.folder
                             status: modelData.status
+                            busyColor: full.applet.colorFor("normal", Kirigami.Theme.backgroundColor)
+                            animate: full.applet.popupShown
                             runningText: modelData.startedAt > 0
                                 ? i18nc("how long a session has been running", "running %1",
                                         Usage.formatDuration(full.applet.now - modelData.startedAt, full.applet.durationUnits))
@@ -357,8 +368,7 @@ PlasmaExtras.Representation {
 
                 Kirigami.Separator {
                     Layout.fillWidth: true
-                    visible: full.showTrend
-                        && (full.showHero || full.showLimits || full.showProducts || full.showSessions)
+                    visible: full.showTrend && full.firstSection !== "trend"
                 }
 
                 SessionTrend {

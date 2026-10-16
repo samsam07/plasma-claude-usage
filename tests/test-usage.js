@@ -191,12 +191,15 @@ print("\nsessions");
         + entry("100", { sessionId: "a", procStart: "100", cwd: "/home/me/projects/app", name: "Fix bug", startedAt: 1000, statusUpdatedAt: 5000, status: "idle" })
         + entry("200", { sessionId: "b", procStart: "200", cwd: "/home/me/projects/web", startedAt: 500, status: "busy" })
         + entry("999", { sessionId: "c", procStart: "300", cwd: "/tmp", name: "Reused pid", startedAt: 2000, status: "busy" })
-        + entry("400", { sessionId: "d", procStart: "400", cwd: "/srv/data", name: "Newest", startedAt: 3000, statusUpdatedAt: 4000, status: "idle" })
+        + entry("400", { sessionId: "d", procStart: "400", cwd: "/srv/data", name: "Newest", startedAt: 3000, statusUpdatedAt: 4000, status: "idle", kind: "interactive" })
+        + entry("500", { sessionId: "e", procStart: "500", cwd: "/home/me", name: "Background", startedAt: 6000, status: "busy", kind: "bg" })
+        + entry("600", { sessionId: "f", procStart: "600", cwd: "/home/me", name: "Spare", startedAt: 6000, status: "idle", kind: "interactive", spare: true })
+        + entry("700", { sessionId: "g", procStart: "700", cwd: "/home/me", name: "Parked", startedAt: 6000, status: "idle", parkedJobId: "j1" })
         + "400" + US + "{broken" + RS;
     const list = parseSessions(text);
-    check("drops reused pids and broken files", list.length, 3);
-    check("busy first", list[0].id, "b");
-    check("then most recently active", list.map(s => s.id).join(","), "b,a,d");
+    check("drops reused pids, broken files, background, spare and parked", list.length, 3);
+    check("busy first", list[0].name, "web");
+    check("then most recently active", list.map(s => s.name).join(","), "web,Fix bug,Newest");
     check("unnamed falls back to folder", list[0].name, "web");
     check("home shortened", list[0].folder, "~/projects/web");
     check("outside home kept", list[2].folder, "/srv/data");

@@ -75,6 +75,9 @@ PlasmoidItem {
 
     preferredRepresentation: inPanel ? null : fullRepresentation
 
+    // Whether the popup's contents are on screen: always, on the desktop.
+    readonly property bool popupShown: expanded || !inPanel
+
     Plasmoid.icon: "com.github.samsam07.claudeusage"
     Plasmoid.status: PlasmaCore.Types.ActiveStatus
     Plasmoid.busy: loading && !hasData
@@ -254,18 +257,30 @@ PlasmoidItem {
         connectedSources: []
         onNewData: (source, data) => {
             disconnectSource(source);
-            root.now = Date.now();
-            root.sessions = Usage.parseSessions(data.stdout);
+            var list = Usage.parseSessions(data.stdout);
+            // Unchanged, keep the old list: a new one rebuilds every row and
+            // restarts their sparks.
+            if (JSON.stringify(list) !== JSON.stringify(root.sessions)) {
+                root.sessions = list;
+            }
         }
+    }
+
+    // Claude Code keeps its sessions in the same config directory as its sign-in.
+    readonly property string sessionsDir: {
+        var path = credentialsPath.trim();
+        var slash = path.lastIndexOf("/");
+        return (slash >= 0 ? path.slice(0, slash) : "~/.claude") + "/sessions";
     }
 
     // Field 22 of /proc/<pid>/stat is the start time Claude Code records as
     // procStart; the process name before it may hold spaces, so cut after ") ".
+    // Builtins only, bar one cat per session, as this runs every few seconds.
     readonly property string sessionsCommand:
-        "printf '%s\\036' \"$HOME\"; cd \"$HOME/.claude/sessions\" 2>/dev/null || exit 0; "
+        "printf '%s\\036' \"$HOME\"; cd " + shellPath(sessionsDir) + " 2>/dev/null || exit 0; "
         + "for f in *.json; do [ -f \"$f\" ] || continue; p=${f%.json}; "
-        + "s=$(sed 's/.*) //' \"/proc/$p/stat\" 2>/dev/null | cut -d' ' -f20); "
-        + "[ -n \"$s\" ] || continue; printf '%s\\037' \"$s\"; cat -- \"$f\"; printf '\\036'; done"
+        + "read -r s 2>/dev/null < \"/proc/$p/stat\" || continue; s=${s##*\") \"}; set -- $s; "
+        + "[ -n \"${20}\" ] || continue; printf '%s\\037' \"${20}\"; cat -- \"$f\"; printf '\\036'; done"
 
     function readSessions() {
         sessionReader.connectSource(sessionsCommand);
@@ -281,11 +296,16 @@ PlasmoidItem {
     readonly property bool anyBusy: sessions.some(session => session.status === "busy")
 
     // Sessions come and go and switch between busy and idle. The panel icon
-    // follows them too, so keep reading while closed, just less often.
+    // follows them too, so keep reading while closed, just less often — and
+    // not at all when neither the list nor the icon would show them.
+    readonly property bool sessionsNeeded: Plasmoid.configuration.animateLogo
+        || (popupShown && Plasmoid.configuration.showSessions)
+
     Timer {
-        interval: root.expanded ? 3000 : 10000
+        id: sessionPoll
+        interval: root.popupShown ? 3000 : 10000
         repeat: true
-        running: true
+        running: root.sessionsNeeded
         triggeredOnStart: true
         onTriggered: root.readSessions()
     }
@@ -308,16 +328,19 @@ PlasmoidItem {
         return "'" + text.replace(/'/g, "'\\''") + "'";
     }
 
-    function readCommand() {
-        var path = credentialsPath.trim();
+    // A path from the settings, quoted for the shell, with a leading ~ expanded.
+    function shellPath(path) {
         if (path === "~") {
-            path = "\"$HOME\"";
-        } else if (path.indexOf("~/") === 0) {
-            path = "\"$HOME\"/" + shellQuote(path.slice(2));
-        } else {
-            path = shellQuote(path);
+            return "\"$HOME\"";
         }
-        return "cat -- " + path;
+        if (path.indexOf("~/") === 0) {
+            return "\"$HOME\"/" + shellQuote(path.slice(2));
+        }
+        return shellQuote(path);
+    }
+
+    function readCommand() {
+        return "cat -- " + shellPath(credentialsPath.trim());
     }
 
     function refresh() {
@@ -525,7 +548,7 @@ PlasmoidItem {
 
     onExpandedChanged: {
         root.now = Date.now();
-        if (root.expanded) {
+        if (root.expanded && root.sessionsNeeded) {
             root.readSessions();
         }
         // Opening the popup is when fresh figures matter most — but not at the
@@ -547,6 +570,11 @@ PlasmoidItem {
         retryDelay = 0;
         retry.stop();
         refresh();
+        // The sessions move with the config directory.
+        sessions = [];
+        if (sessionPoll.running) {
+            readSessions();
+        }
     }
 
     Component.onCompleted: {

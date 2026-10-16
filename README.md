@@ -48,16 +48,21 @@ Right-click the widget → **Configure Claude Usage…**
 | Setting | Default | Notes |
 | --- | --- | --- |
 | Ring shows | Current session | The 5-hour session, the week across all models, or whichever is closest to its limit |
+| Panel icon: animate while a session is working | On | |
+| Popup shows | Everything | Each section can be hidden: the ring's limit, other limits and credits, usage by product, recent sessions, the trend, and the settings button. With the ring's limit hidden, it is listed with the other limits |
+| Sessions: only those working | Off | |
+| Sessions: show up to | 3 | 1 to 20 |
 | Turn yellow at | 75% | |
 | Turn red at | 90% | |
 | Refresh every | 5 minutes | At least 2; see [Rate limit](#rate-limit) |
-| Credentials file | `~/.claude/.credentials.json` | Change only if you run Claude Code with `CLAUDE_CONFIG_DIR` |
+| Credentials file | `~/.claude/.credentials.json` | Change only if you run Claude Code with `CLAUDE_CONFIG_DIR`. Sessions are read from `sessions/` in the same directory |
 
 ## How it behaves
 
 - The ring shows one limit. The popup shows that limit large, then every
   other limit as a bar, usage credits if you have them switched on, this
-  week's usage by product, and the session chart.
+  week's usage by product, your recent Claude Code sessions, and the session
+  chart.
 - Percentages are rounded down, as Claude Code rounds them: 99.6% reads `99%`.
 - Resets under a day away read `Resets in 2 h 13 min`; further out,
   `Resets Wed 23 Sep, 7:00 PM`.
@@ -71,6 +76,22 @@ Claude Code, Chats, Cowork and Other, each as a share of this week's usage,
 exactly as claude.ai's usage page lists them. The shares add up to 100% of what
 you have used, not of your limit. The bars use your Plasma accent colour, so
 they don't look like the limit bars' orange, yellow and red.
+
+### Recent sessions
+
+The Claude Code sessions open on this computer, working ones first, then the
+most recently active, each with its name, project folder and how long it has
+been running. While any of them is working, the panel icon becomes the spark
+Claude Code shows while it works. With Plasma's animations switched off, the
+spark holds still.
+
+They come from the files Claude Code keeps in `~/.claude/sessions`, one per
+process. A file only counts while its process is alive and started when the
+file says, so a crashed session or a reused process id is not listed.
+Claude Code's background jobs and spare processes are left out. The widget
+re-reads the directory every 3 seconds while the popup is open and every 10
+while it is closed, and stops when both the list and the panel animation are
+switched off.
 
 ### Session chart
 
@@ -151,6 +172,8 @@ package/contents/
     ├── UsageRing.qml              the ring itself, used in both
     ├── LimitRow.qml               one limit's bar in the popup
     ├── ProductRow.qml             one product's share of the week
+    ├── SessionRow.qml             one running Claude Code session
+    ├── ClaudeSpinner.qml          the spark shown while a session works
     ├── SessionTrend.qml           the seven-day session chart
     └── configGeneral.qml          the settings page
 ```

@@ -494,6 +494,8 @@ function formatDuration(ms, units) {
  *   HOME RS start US json RS start US json RS ...
  * (RS = \x1e, US = \x1f). A file is only kept when the start time matches the
  * procStart it records, so a reused process id does not resurrect a session.
+ * Claude Code writes the same files for its background jobs and for spare
+ * processes it starts ahead of need; only sessions someone opened are kept.
  */
 function parseSessions(text) {
     var records = String(text || "").split("\x1e");
@@ -517,9 +519,12 @@ function parseSessions(text) {
         if (json.procStart !== undefined && String(json.procStart) !== liveStart) {
             return;
         }
+        // Files from before Claude Code recorded a kind are interactive.
+        if ((json.kind !== undefined && json.kind !== "interactive") || json.spare || json.parkedJobId) {
+            return;
+        }
         var cwd = typeof json.cwd === "string" ? json.cwd : "";
         list.push({
-            id: String(json.sessionId || json.pid || list.length),
             name: typeof json.name === "string" && json.name !== "" ? json.name : folderName(cwd),
             folder: homeRelative(cwd, home),
             startedAt: Number(json.startedAt) || 0,

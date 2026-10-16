@@ -1,6 +1,7 @@
 /*
  * The spark Claude Code cycles through while it works — · ✢ ✳ ✶ ✻ ✽ and back
- * — in Claude orange. Holds still when Plasma's animations are switched off.
+ * — in Claude orange. Holds still on its fullest frame when Plasma's
+ * animations are switched off.
  *
  * Drawn rather than set as text: the glyphs come from different fonts that
  * report their extents unreliably, so as text they could not be kept centred
@@ -11,13 +12,11 @@ import QtQuick
 
 import org.kde.kirigami as Kirigami
 
-import "../code/usage.js" as Usage
-
 Canvas {
     id: spinner
 
     property bool running: true
-    property color color: Usage.COLORS.dark.normal
+    required property color color
     // Diameter of the largest frame.
     property real size: Kirigami.Units.iconSizes.small
 
@@ -25,10 +24,15 @@ Canvas {
     readonly property var frames: [0, 1, 2, 3, 4, 5, 4, 3, 2, 1]
     property int frame: 0
 
+    // Plasma never reports a duration under 1 ms, so 1 is what "off" reads as.
+    readonly property bool animating: running && visible && Kirigami.Units.longDuration > 1
+    // Standing still, the dot would be all but invisible; show the full spark.
+    readonly property int shape: animating ? frames[frame] : 5
+
     implicitWidth: size
     implicitHeight: size
 
-    onFrameChanged: requestPaint()
+    onShapeChanged: requestPaint()
     onColorChanged: requestPaint()
     onSizeChanged: requestPaint()
     onWidthChanged: requestPaint()
@@ -66,7 +70,7 @@ Canvas {
         ctx.strokeStyle = color;
         var i;
 
-        switch (frames[frame]) {
+        switch (shape) {
         case 0: // ·
             dot(ctx, 0, 0, r * 0.14);
             break;
@@ -113,7 +117,7 @@ Canvas {
     Timer {
         interval: 120
         repeat: true
-        running: spinner.running && spinner.visible && Kirigami.Units.longDuration > 0
+        running: spinner.animating
         onTriggered: spinner.frame = (spinner.frame + 1) % spinner.frames.length
     }
 }
