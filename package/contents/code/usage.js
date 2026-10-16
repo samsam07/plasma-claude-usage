@@ -484,3 +484,67 @@ function formatDuration(ms, units) {
     }
     return minutes + " " + units.minute;
 }
+
+// ------------------------------------------------------------ sessions
+
+/*
+ * Running Claude Code sessions, from the files it keeps in ~/.claude/sessions,
+ * one per process. The widget's reader prints $HOME, then for each file whose
+ * process still exists that process's start time and the file, as
+ *   HOME RS start US json RS start US json RS ...
+ * (RS = \x1e, US = \x1f). A file is only kept when the start time matches the
+ * procStart it records, so a reused process id does not resurrect a session.
+ */
+function parseSessions(text) {
+    var records = String(text || "").split("\x1e");
+    var home = records.shift() || "";
+    var list = [];
+    records.forEach(function (record) {
+        var cut = record.indexOf("\x1f");
+        if (cut < 0) {
+            return;
+        }
+        var liveStart = record.slice(0, cut).trim();
+        var json;
+        try {
+            json = JSON.parse(record.slice(cut + 1));
+        } catch (e) {
+            return;
+        }
+        if (!json || typeof json !== "object") {
+            return;
+        }
+        if (json.procStart !== undefined && String(json.procStart) !== liveStart) {
+            return;
+        }
+        var cwd = typeof json.cwd === "string" ? json.cwd : "";
+        list.push({
+            id: String(json.sessionId || json.pid || list.length),
+            name: typeof json.name === "string" && json.name !== "" ? json.name : folderName(cwd),
+            folder: homeRelative(cwd, home),
+            startedAt: Number(json.startedAt) || 0,
+            // When it last started or finished a task.
+            lastActive: Number(json.statusUpdatedAt) || Number(json.updatedAt) || Number(json.startedAt) || 0,
+            status: typeof json.status === "string" ? json.status : ""
+        });
+    });
+    // Busy ones first, then the most recently active.
+    list.sort(function (a, b) {
+        var busy = (b.status === "busy") - (a.status === "busy");
+        return busy !== 0 ? busy : b.lastActive - a.lastActive;
+    });
+    return list;
+}
+
+function folderName(path) {
+    var parts = String(path).split("/").filter(function (part) { return part !== ""; });
+    return parts.length > 0 ? parts[parts.length - 1] : String(path);
+}
+
+function homeRelative(path, home) {
+    home = String(home || "").replace(/\/+$/, "");
+    if (home !== "" && (path === home || path.indexOf(home + "/") === 0)) {
+        return "~" + path.slice(home.length);
+    }
+    return path;
+}

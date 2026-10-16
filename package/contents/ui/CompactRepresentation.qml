@@ -52,11 +52,25 @@ MouseArea {
         opacity: compact.applet.stale ? 0.55 : 1
 
         Kirigami.Icon {
+            id: logo
             anchors.centerIn: parent
             width: Math.round(parent.diameter * 0.52)
             height: width
             source: Qt.resolvedUrl("../icons/claude.svg")
             opacity: compact.applet.hasData ? 1 : 0.6
+            visible: !spinner.visible
+        }
+
+        // While a Claude Code session is working, the mark becomes the spark
+        // Claude Code cycles through — the same one the popup shows per session.
+        ClaudeSpinner {
+            id: spinner
+            anchors.centerIn: parent
+            width: logo.width
+            height: logo.height
+            size: logo.width
+            visible: compact.applet.anyBusy && Plasmoid.configuration.animateLogo
+            running: visible
         }
     }
 }

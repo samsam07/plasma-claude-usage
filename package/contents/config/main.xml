@@ -39,5 +39,52 @@
       <default>~/.claude/.credentials.json</default>
     </entry>
 
+    <entry name="showMainLimit" type="Bool">
+      <label>Show the ring's limit large at the top of the popup</label>
+      <default>true</default>
+    </entry>
+
+    <entry name="showOtherLimits" type="Bool">
+      <label>Show the other limits and usage credits</label>
+      <default>true</default>
+    </entry>
+
+    <entry name="showProducts" type="Bool">
+      <label>Show this week's usage by product</label>
+      <default>true</default>
+    </entry>
+
+    <entry name="showSessions" type="Bool">
+      <label>Show the most recently active Claude Code sessions</label>
+      <default>true</default>
+    </entry>
+
+    <entry name="showTrend" type="Bool">
+      <label>Show the seven-day session trend</label>
+      <default>true</default>
+    </entry>
+
+    <entry name="showSettingsButton" type="Bool">
+      <label>Show a button in the popup that opens these settings</label>
+      <default>true</default>
+    </entry>
+
+    <entry name="animateLogo" type="Bool">
+      <label>Animate the panel icon while a Claude Code session is working</label>
+      <default>true</default>
+    </entry>
+
+    <entry name="sessionsBusyOnly" type="Bool">
+      <label>List only sessions that are working</label>
+      <default>false</default>
+    </entry>
+
+    <entry name="sessionCount" type="Int">
+      <label>How many sessions to list</label>
+      <default>3</default>
+      <min>1</min>
+      <max>20</max>
+    </entry>
+
   </group>
 </kcfg>

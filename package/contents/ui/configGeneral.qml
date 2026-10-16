@@ -13,6 +13,15 @@ KCM.SimpleKCM {
     property alias cfg_criticalPercent: criticalField.value
     property alias cfg_refreshMinutes: refreshField.value
     property alias cfg_credentialsPath: pathField.text
+    property alias cfg_showMainLimit: showMainLimitBox.checked
+    property alias cfg_showOtherLimits: showOtherLimitsBox.checked
+    property alias cfg_showProducts: showProductsBox.checked
+    property alias cfg_showSessions: showSessionsBox.checked
+    property alias cfg_showTrend: showTrendBox.checked
+    property alias cfg_showSettingsButton: showSettingsButtonBox.checked
+    property alias cfg_animateLogo: animateLogoBox.checked
+    property alias cfg_sessionsBusyOnly: busyOnlyBox.checked
+    property alias cfg_sessionCount: sessionCountField.value
 
     Kirigami.FormLayout {
         anchors.fill: parent
@@ -36,6 +45,76 @@ KCM.SimpleKCM {
                 if (currentIndex < 0) {
                     currentIndex = 0;
                 }
+            }
+        }
+
+        Item {
+            Kirigami.FormData.isSection: true
+        }
+
+        QQC2.CheckBox {
+            id: animateLogoBox
+            Kirigami.FormData.label: i18n("Panel icon:")
+            text: i18n("Animate while a Claude Code session is working")
+        }
+
+        Item {
+            Kirigami.FormData.isSection: true
+        }
+
+        QQC2.CheckBox {
+            id: showMainLimitBox
+            Kirigami.FormData.label: i18n("Popup shows:")
+            text: i18n("The ring's limit")
+        }
+
+        QQC2.CheckBox {
+            id: showOtherLimitsBox
+            text: i18n("Other limits and usage credits")
+        }
+
+        QQC2.CheckBox {
+            id: showProductsBox
+            text: i18n("This week's usage by product")
+        }
+
+        QQC2.CheckBox {
+            id: showSessionsBox
+            text: i18n("Recent Claude Code sessions")
+        }
+
+        QQC2.CheckBox {
+            id: showTrendBox
+            text: i18n("Seven-day session trend")
+        }
+
+        QQC2.CheckBox {
+            id: showSettingsButtonBox
+            text: i18n("Settings button")
+        }
+
+        Item {
+            Kirigami.FormData.isSection: true
+        }
+
+        QQC2.CheckBox {
+            id: busyOnlyBox
+            Kirigami.FormData.label: i18n("Sessions:")
+            enabled: showSessionsBox.checked
+            text: i18n("Only those working on a task")
+        }
+
+        QQC2.SpinBox {
+            id: sessionCountField
+            Kirigami.FormData.label: i18n("Show up to:")
+            enabled: showSessionsBox.checked
+            from: 1
+            to: 20
+            editable: true
+            textFromValue: (value, locale) => i18np("%1 session", "%1 sessions", value)
+            valueFromText: (text, locale) => {
+                var n = parseInt(text, 10);
+                return isNaN(n) ? sessionCountField.value : n;
             }
         }
 

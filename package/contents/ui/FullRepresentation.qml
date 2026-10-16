@@ -12,6 +12,7 @@ import QtQuick.Layouts
 import org.kde.kirigami as Kirigami
 import org.kde.plasma.components as PlasmaComponents3
 import org.kde.plasma.extras as PlasmaExtras
+import org.kde.plasma.plasmoid
 
 import "../code/usage.js" as Usage
 
@@ -27,13 +28,26 @@ PlasmaExtras.Representation {
         ? applet.colorFor(hero.level, Kirigami.Theme.backgroundColor)
         : Kirigami.Theme.disabledTextColor
 
+    // Which sections are on screen: switched on in the settings, and with
+    // something to show. A separator goes above each one that has another above it.
+    readonly property var cfg: Plasmoid.configuration
+    readonly property bool showHero: cfg.showMainLimit && hero !== null
+    readonly property bool showLimits: cfg.showOtherLimits && (others.length > 0 || applet.credits !== null)
+    readonly property bool showProducts: cfg.showProducts && applet.breakdown !== null
+    readonly property bool showSessions: cfg.showSessions
+    readonly property bool showTrend: cfg.showTrend && applet.hasData
+
     Layout.minimumWidth: Kirigami.Units.gridUnit * 18
     Layout.preferredWidth: Kirigami.Units.gridUnit * 20
-    Layout.minimumHeight: Kirigami.Units.gridUnit * 14
     // Tall enough for everything, up to a point; past that the body scrolls.
-    Layout.preferredHeight: Math.max(Layout.minimumHeight, Math.min(Kirigami.Units.gridUnit * 38,
-        body.implicitHeight + Kirigami.Units.largeSpacing * 2
-        + (header ? header.implicitHeight : 0) + (footer ? footer.implicitHeight : 0)))
+    readonly property real fullHeight: Math.min(Kirigami.Units.gridUnit * 38,
+        body.implicitHeight + Kirigami.Units.largeSpacing * 2 + chromeHeight)
+    // Plasma restores the popup's last size over the preferred one, so only the
+    // minimum is sure to hold — without data it must fit the sign-in message.
+    Layout.minimumHeight: Math.max(Kirigami.Units.gridUnit * 14, applet.hasData ? 0 : fullHeight)
+    Layout.preferredHeight: Math.max(Layout.minimumHeight, fullHeight)
+
+    readonly property real chromeHeight: (header ? header.implicitHeight : 0) + (footer ? footer.implicitHeight : 0)
 
     collapseMarginsHint: true
 
@@ -72,53 +86,8 @@ PlasmaExtras.Representation {
         }
     }
 
-    // Nothing cached and nothing fetched — say why, and offer a way forward.
-    PlasmaExtras.PlaceholderMessage {
-        anchors.centerIn: parent
-        width: parent.width - Kirigami.Units.gridUnit * 3
-        visible: !full.applet.hasData && !full.applet.loading
-        iconName: {
-            switch (full.applet.authState) {
-            case "missing":
-            case "expired":
-            case "denied":
-                return "dialog-password";
-            default:
-                return "network-disconnect-symbolic";
-            }
-        }
-        text: {
-            switch (full.applet.authState) {
-            case "missing":
-                return i18n("Sign in to Claude Code");
-            case "expired":
-                return i18n("Claude Code's sign-in has expired");
-            case "denied":
-                return i18n("Usage is not available to this sign-in");
-            default:
-                return i18n("No usage available");
-            }
-        }
-        explanation: {
-            switch (full.applet.authState) {
-            case "missing":
-                return i18n("This widget reads the sign-in Claude Code keeps on this computer. Run <b>claude</b> in a terminal and log in with your Claude account.");
-            case "expired":
-                return i18n("Using Claude Code renews it, and the widget picks the new one up on its next refresh.");
-            case "denied":
-                return i18n("Run <b>claude</b>, then <b>/login</b>, to sign in again.");
-            default:
-                return full.applet.errorText !== "" ? full.applet.errorText : i18n("Usage has not been loaded yet.");
-            }
-        }
-        helpfulAction: Kirigami.Action {
-            text: i18n("Refresh")
-            icon.name: "view-refresh"
-            onTriggered: full.applet.refresh()
-        }
-    }
-
     PlasmaComponents3.BusyIndicator {
+        id: busy
         anchors.centerIn: parent
         visible: running
         running: full.applet.loading && !full.applet.hasData
@@ -127,7 +96,7 @@ PlasmaExtras.Representation {
     PlasmaComponents3.ScrollView {
         id: scroll
         anchors.fill: parent
-        visible: full.applet.hasData
+        visible: !busy.running
         contentWidth: availableWidth
         PlasmaComponents3.ScrollBar.horizontal.policy: PlasmaComponents3.ScrollBar.AlwaysOff
 
@@ -145,11 +114,53 @@ PlasmaExtras.Representation {
                 anchors.rightMargin: Kirigami.Units.largeSpacing * 2
                 spacing: Kirigami.Units.largeSpacing
 
+                // Nothing cached and nothing fetched — say why, and offer a way forward.
+                PlasmaExtras.PlaceholderMessage {
+                    id: placeholder
+                    Layout.fillWidth: true
+                    Layout.topMargin: Kirigami.Units.largeSpacing
+                    visible: !full.applet.hasData
+                    iconName: {
+                        switch (full.applet.authState) {
+                        case "missing":
+                        case "expired":
+                        case "denied":
+                            return "dialog-password";
+                        default:
+                            return "network-disconnect-symbolic";
+                        }
+                    }
+                    text: {
+                        switch (full.applet.authState) {
+                        case "missing":
+                            return i18n("Sign in to Claude Code");
+                        case "expired":
+                            return i18n("Claude Code's sign-in has expired");
+                        case "denied":
+                            return i18n("Usage is not available to this sign-in");
+                        default:
+                            return i18n("No usage available");
+                        }
+                    }
+                    explanation: {
+                        switch (full.applet.authState) {
+                        case "missing":
+                            return i18n("This widget reads the sign-in Claude Code keeps on this computer. Run <b>claude</b> in a terminal and log in with your Claude account.");
+                        case "expired":
+                            return i18n("Using Claude Code renews it, and the widget picks the new one up on its next refresh.");
+                        case "denied":
+                            return i18n("Run <b>claude</b>, then <b>/login</b>, to sign in again.");
+                        default:
+                            return full.applet.errorText !== "" ? full.applet.errorText : i18n("Usage has not been loaded yet.");
+                        }
+                    }
+                }
+
                 // ---------------------------------------------------- hero
 
                 RowLayout {
                     Layout.fillWidth: true
-                    visible: full.hero !== null
+                    visible: full.showHero
                     spacing: Kirigami.Units.largeSpacing * 2
 
                     UsageRing {
@@ -214,46 +225,52 @@ PlasmaExtras.Representation {
 
                 Kirigami.Separator {
                     Layout.fillWidth: true
-                    visible: full.others.length > 0 || full.applet.credits !== null
+                    visible: full.showLimits && full.showHero
                 }
 
                 // ---------------------------------------------------- others
 
-                Repeater {
-                    model: full.others
-
-                    delegate: LimitRow {
-                        required property var modelData
-                        Layout.fillWidth: true
-                        title: full.applet.titleFor(modelData)
-                        valueText: Usage.percentText(modelData.percent)
-                        subtitle: full.applet.resetText(modelData)
-                        value: modelData.ratio
-                        barColor: full.applet.colorFor(modelData.level, Kirigami.Theme.backgroundColor)
-                    }
-                }
-
-                LimitRow {
-                    readonly property var credits: full.applet.credits
-                    readonly property bool hasPercent: credits !== null && credits.percent !== null
-
+                ColumnLayout {
                     Layout.fillWidth: true
-                    visible: credits !== null
-                    title: i18n("Usage credits")
-                    valueText: hasPercent ? Usage.percentText(credits.percent) : ""
-                    value: hasPercent ? Math.min(1, credits.percent / 100) : -1
-                    barColor: hasPercent
-                        ? full.applet.colorFor(Usage.levelFor(credits.percent, credits.severity,
-                                                              full.applet.warningPercent, full.applet.criticalPercent),
-                                               Kirigami.Theme.backgroundColor)
-                        : Kirigami.Theme.highlightColor
-                    subtitle: {
-                        if (credits === null || credits.used === "") {
-                            return "";
+                    visible: full.showLimits
+                    spacing: Kirigami.Units.largeSpacing
+
+                    Repeater {
+                        model: full.others
+
+                        delegate: LimitRow {
+                            required property var modelData
+                            Layout.fillWidth: true
+                            title: full.applet.titleFor(modelData)
+                            valueText: Usage.percentText(modelData.percent)
+                            subtitle: full.applet.resetText(modelData)
+                            value: modelData.ratio
+                            barColor: full.applet.colorFor(modelData.level, Kirigami.Theme.backgroundColor)
                         }
-                        return credits.limit !== ""
-                            ? i18nc("money spent of a monthly limit", "%1 spent of %2", credits.used, credits.limit)
-                            : i18nc("money spent", "%1 spent", credits.used);
+                    }
+
+                    LimitRow {
+                        readonly property var credits: full.applet.credits
+                        readonly property bool hasPercent: credits !== null && credits.percent !== null
+
+                        Layout.fillWidth: true
+                        visible: credits !== null
+                        title: i18n("Usage credits")
+                        valueText: hasPercent ? Usage.percentText(credits.percent) : ""
+                        value: hasPercent ? Math.min(1, credits.percent / 100) : -1
+                        barColor: hasPercent
+                            ? full.applet.colorFor(Usage.levelFor(credits.percent, credits.severity,
+                                                                  full.applet.warningPercent, full.applet.criticalPercent),
+                                                   Kirigami.Theme.backgroundColor)
+                            : Kirigami.Theme.highlightColor
+                        subtitle: {
+                            if (credits === null || credits.used === "") {
+                                return "";
+                            }
+                            return credits.limit !== ""
+                                ? i18nc("money spent of a monthly limit", "%1 spent of %2", credits.used, credits.limit)
+                                : i18nc("money spent", "%1 spent", credits.used);
+                        }
                     }
                 }
 
@@ -261,12 +278,12 @@ PlasmaExtras.Representation {
 
                 Kirigami.Separator {
                     Layout.fillWidth: true
-                    visible: full.applet.breakdown !== null
+                    visible: full.showProducts && (full.showHero || full.showLimits)
                 }
 
                 ColumnLayout {
                     Layout.fillWidth: true
-                    visible: full.applet.breakdown !== null
+                    visible: full.showProducts
                     spacing: Kirigami.Units.smallSpacing
 
                     PlasmaComponents3.Label {
@@ -288,14 +305,65 @@ PlasmaExtras.Representation {
                     }
                 }
 
+                // ------------------------------------------------------ sessions
+
+                Kirigami.Separator {
+                    Layout.fillWidth: true
+                    visible: full.showSessions
+                        && (!full.applet.hasData || full.showHero || full.showLimits || full.showProducts)
+                }
+
+                ColumnLayout {
+                    Layout.fillWidth: true
+                    visible: full.showSessions
+                    spacing: Kirigami.Units.smallSpacing
+
+                    PlasmaComponents3.Label {
+                        Layout.fillWidth: true
+                        text: full.cfg.sessionsBusyOnly
+                            ? i18n("Running Claude Code sessions")
+                            : i18n("Recent Claude Code sessions")
+                        font.weight: Font.DemiBold
+                        elide: Text.ElideRight
+                    }
+
+                    PlasmaComponents3.Label {
+                        Layout.fillWidth: true
+                        visible: full.applet.recentSessions.length === 0
+                        text: full.cfg.sessionsBusyOnly
+                            ? i18n("None running")
+                            : i18n("No Claude Code sessions open")
+                        color: Kirigami.Theme.disabledTextColor
+                    }
+
+                    Repeater {
+                        model: full.applet.recentSessions
+
+                        delegate: SessionRow {
+                            required property var modelData
+                            Layout.fillWidth: true
+                            name: modelData.name
+                            folder: modelData.folder
+                            status: modelData.status
+                            runningText: modelData.startedAt > 0
+                                ? i18nc("how long a session has been running", "running %1",
+                                        Usage.formatDuration(full.applet.now - modelData.startedAt, full.applet.durationUnits))
+                                : ""
+                        }
+                    }
+                }
+
                 // --------------------------------------------------------- trend
 
                 Kirigami.Separator {
                     Layout.fillWidth: true
+                    visible: full.showTrend
+                        && (full.showHero || full.showLimits || full.showProducts || full.showSessions)
                 }
 
                 SessionTrend {
                     Layout.fillWidth: true
+                    visible: full.showTrend
                     applet: full.applet
                 }
 
@@ -347,10 +415,22 @@ PlasmaExtras.Representation {
             }
 
             PlasmaComponents3.ToolButton {
-                icon.name: "internet-web-browser"
+                icon.name: "globe-symbolic"
                 display: PlasmaComponents3.AbstractButton.IconOnly
                 text: i18n("Open Usage on claude.ai")
                 onClicked: Qt.openUrlExternally(full.applet.usagePage)
+
+                PlasmaComponents3.ToolTip.text: text
+                PlasmaComponents3.ToolTip.visible: hovered
+                PlasmaComponents3.ToolTip.delay: Kirigami.Units.toolTipDelay
+            }
+
+            PlasmaComponents3.ToolButton {
+                visible: full.cfg.showSettingsButton
+                icon.name: "configure-symbolic"
+                display: PlasmaComponents3.AbstractButton.IconOnly
+                text: i18n("Configure Claude Usage…")
+                onClicked: Plasmoid.internalAction("configure").trigger()
 
                 PlasmaComponents3.ToolTip.text: text
                 PlasmaComponents3.ToolTip.visible: hovered

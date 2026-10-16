@@ -104,7 +104,7 @@ PlasmoidItem {
         },
         PlasmaCore.Action {
             text: i18n("Open Usage on claude.ai")
-            icon.name: "internet-web-browser"
+            icon.name: "globe-symbolic"
             onTriggered: Qt.openUrlExternally(root.usagePage)
         }
     ]
@@ -241,6 +241,53 @@ PlasmoidItem {
         } catch (e) {
             console.warn("claudeusage: could not write session history:", e);
         }
+    }
+
+    // ------------------------------------------------------------- sessions
+
+    // Running Claude Code sessions; see Usage.parseSessions() for the format.
+    property var sessions: []
+
+    P5Support.DataSource {
+        id: sessionReader
+        engine: "executable"
+        connectedSources: []
+        onNewData: (source, data) => {
+            disconnectSource(source);
+            root.now = Date.now();
+            root.sessions = Usage.parseSessions(data.stdout);
+        }
+    }
+
+    // Field 22 of /proc/<pid>/stat is the start time Claude Code records as
+    // procStart; the process name before it may hold spaces, so cut after ") ".
+    readonly property string sessionsCommand:
+        "printf '%s\\036' \"$HOME\"; cd \"$HOME/.claude/sessions\" 2>/dev/null || exit 0; "
+        + "for f in *.json; do [ -f \"$f\" ] || continue; p=${f%.json}; "
+        + "s=$(sed 's/.*) //' \"/proc/$p/stat\" 2>/dev/null | cut -d' ' -f20); "
+        + "[ -n \"$s\" ] || continue; printf '%s\\037' \"$s\"; cat -- \"$f\"; printf '\\036'; done"
+
+    function readSessions() {
+        sessionReader.connectSource(sessionsCommand);
+    }
+
+    // What the popup lists: working ones first, then the most recently active,
+    // or only the working ones, up to the number chosen in the settings.
+    readonly property var recentSessions: (Plasmoid.configuration.sessionsBusyOnly
+            ? sessions.filter(session => session.status === "busy")
+            : sessions)
+        .slice(0, Math.max(1, Plasmoid.configuration.sessionCount))
+    // The panel's Claude mark animates while any session is working.
+    readonly property bool anyBusy: sessions.some(session => session.status === "busy")
+
+    // Sessions come and go and switch between busy and idle. The panel icon
+    // follows them too, so keep reading while closed, just less often.
+    Timer {
+        interval: root.expanded ? 3000 : 10000
+        repeat: true
+        running: true
+        triggeredOnStart: true
+        onTriggered: root.readSessions()
     }
 
     // ---------------------------------------------------------- credentials
@@ -478,6 +525,9 @@ PlasmoidItem {
 
     onExpandedChanged: {
         root.now = Date.now();
+        if (root.expanded) {
+            root.readSessions();
+        }
         // Opening the popup is when fresh figures matter most — but not at the
         // cost of tripping the rate limit again.
         if (root.expanded && !retry.running && Date.now() - root.lastFetch > 60000) {
