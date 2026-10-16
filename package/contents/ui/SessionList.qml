@@ -78,6 +78,8 @@ ColumnLayout {
                     status: modelData.status
                     busyColor: list.busyColor
                     animate: list.applet.popupShown
+                    // The petal wave when the panel shows it; the spark frames otherwise.
+                    spinnerStyle: Plasmoid.configuration.panelAnimation === "wave" ? "wave" : "frames"
                     runningText: modelData.startedAt > 0
                         ? Usage.formatDuration(list.applet.now - modelData.startedAt, list.applet.durationUnits)
                         : ""

@@ -20,6 +20,8 @@ RowLayout {
     required property color busyColor
     // Off while the popup is closed, so a hidden row does not keep drawing.
     property bool animate: true
+    // ClaudeSpinner's style: "frames" or "wave".
+    property string spinnerStyle: "frames"
 
     readonly property bool busy: status === "busy"
     readonly property real indicatorWidth: rowSpinner.size
@@ -44,6 +46,7 @@ RowLayout {
             anchors.centerIn: parent
             visible: session.busy
             running: session.busy && session.animate
+            style: session.spinnerStyle
             color: session.busyColor
             size: Math.round(nameLabel.implicitHeight * 0.75)
         }

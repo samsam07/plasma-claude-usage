@@ -51,7 +51,7 @@ Right-click the widget → **Configure Claude Usage…**
 | Setting | Default | Notes |
 | --- | --- | --- |
 | Ring shows | Current session | The 5-hour session, the week across all models, or whichever is closest to its limit. The popup always leads with the session |
-| Panel icon: animate while a session is working | On | |
+| Panel icon while a session works | Spark frames | Or Petal wave, Turning mark, Orbit, or No animation; see [Claude Code sessions](#claude-code-sessions) |
 | Popup shows | Everything | Each section can be hidden: the current session, this week's limits and credits, this week by product, Claude Code sessions, the last seven days, and the settings button |
 | Sessions: only those working | Off | |
 | Last seven days as | When you use Claude, by the hour | Or each session's peak, as bars |
@@ -102,10 +102,22 @@ The Claude Code sessions open on this computer, working ones first, then the
 most recently active, one line each: its name, and `Busy` with how long it has
 been running, or `Idle`. The list shows as many as fit in the room it has,
 which is at least three lines, and counts the rest on the last line, such as
-`+2 idle sessions`. While any of them is working, the panel icon becomes the
-spark Claude Code shows while it works. Like Plasma's own busy indicators, it
-keeps moving with Plasma's animations set to Instant; switch it off in the
-widget's settings instead.
+`+2 idle sessions`.
+
+While any of them is working, the panel icon animates, in the style chosen in
+the settings:
+
+- **Spark frames**, the default: the mark becomes the spark Claude Code
+  itself steps through, `· ✢ ✳ ✶ ✻ ✽` and back, a frame every 375 ms.
+- **Petal wave**: a spark whose eight rays swell and settle in a wave that
+  travels round it, once every 1.4 s.
+- **Turning mark**: the Claude mark turns once every 3.2 s and breathes.
+- **Orbit**: the mark stays still, and a light laps the usage ring every 1.6 s.
+
+A working session's row in the popup shows the petal wave when that is
+chosen, and the spark frames otherwise. Like Plasma's own busy indicators, the
+animations keep moving with Plasma's animations set to Instant; choose
+**No animation** instead.
 
 They come from the files Claude Code keeps in `~/.claude/sessions`, one per
 process. A file only counts while its process is alive and started when the

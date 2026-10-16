@@ -74,6 +74,11 @@
       <default>true</default>
     </entry>
 
+    <entry name="panelAnimation" type="String">
+      <label>How the panel icon animates: frames, wave, spin or orbit</label>
+      <default>frames</default>
+    </entry>
+
     <entry name="sessionsBusyOnly" type="Bool">
       <label>List only sessions that are working</label>
       <default>false</default>

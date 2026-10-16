@@ -19,7 +19,8 @@ KCM.SimpleKCM {
     property alias cfg_showSessions: showSessionsBox.checked
     property alias cfg_showTrend: showTrendBox.checked
     property alias cfg_showSettingsButton: showSettingsButtonBox.checked
-    property alias cfg_animateLogo: animateLogoBox.checked
+    property bool cfg_animateLogo
+    property string cfg_panelAnimation
     property alias cfg_sessionsBusyOnly: busyOnlyBox.checked
     property string cfg_historyChart
 
@@ -52,10 +53,56 @@ KCM.SimpleKCM {
             Kirigami.FormData.isSection: true
         }
 
-        QQC2.CheckBox {
-            id: animateLogoBox
-            Kirigami.FormData.label: i18n("Panel icon:")
-            text: i18n("Animate while a Claude Code session is working")
+        // "None" is the old switch turned off, so it keeps its own setting and
+        // a choice made before it carries over.
+        QQC2.ComboBox {
+            id: animationBox
+            Kirigami.FormData.label: i18n("Panel icon while a session works:")
+
+            textRole: "label"
+            valueRole: "value"
+            model: [
+                { value: "frames", label: i18n("Spark frames") },
+                { value: "wave", label: i18n("Petal wave") },
+                { value: "spin", label: i18n("Turning mark") },
+                { value: "orbit", label: i18n("Orbit") },
+                { value: "none", label: i18n("No animation") }
+            ]
+
+            onActivated: {
+                page.cfg_animateLogo = currentValue !== "none";
+                if (currentValue !== "none") {
+                    page.cfg_panelAnimation = currentValue;
+                }
+            }
+
+            Component.onCompleted: {
+                currentIndex = indexOfValue(page.cfg_animateLogo ? page.cfg_panelAnimation : "none");
+                if (currentIndex < 0) {
+                    currentIndex = 0;
+                }
+            }
+        }
+
+        QQC2.Label {
+            Layout.maximumWidth: Kirigami.Units.gridUnit * 22
+            text: {
+                switch (animationBox.currentValue) {
+                case "wave":
+                    return i18n("Eight rays swell and settle in a wave that travels round the spark.");
+                case "spin":
+                    return i18n("The Claude mark turns slowly and breathes.");
+                case "orbit":
+                    return i18n("The mark stays still; a light laps the usage ring.");
+                case "none":
+                    return i18n("The Claude mark stays as it is.");
+                default:
+                    return i18n("The spark Claude Code steps through itself: · ✢ ✳ ✶ ✻ ✽ and back.");
+                }
+            }
+            wrapMode: Text.Wrap
+            font: Kirigami.Theme.smallFont
+            color: Kirigami.Theme.disabledTextColor
         }
 
         Item {

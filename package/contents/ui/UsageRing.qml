@@ -19,6 +19,10 @@ Item {
                                        Kirigami.Theme.textColor.g,
                                        Kirigami.Theme.textColor.b, 0.2)
     property real thickness: Math.max(1.5, diameter * 0.1)
+    // A light a fifth of the ring long laps it while this is on, over the
+    // usage arc, which keeps showing beneath.
+    property bool orbiting: false
+    property int orbitMs: 1600
 
     readonly property real diameter: Math.min(width, height)
     readonly property real radius: Math.max(0, (diameter - thickness) / 2)
@@ -61,6 +65,40 @@ Item {
                 startAngle: -90
                 sweepAngle: 360 * Math.max(0, Math.min(1, ring.value))
             }
+        }
+    }
+
+    // Turned whole by an animator, on the render thread, so lapping costs
+    // nothing in QML.
+    Shape {
+        id: orbit
+        anchors.fill: parent
+        visible: ring.orbiting
+        preferredRendererType: Shape.CurveRenderer
+
+        ShapePath {
+            fillColor: "transparent"
+            strokeColor: Qt.rgba(Kirigami.Theme.textColor.r, Kirigami.Theme.textColor.g,
+                                 Kirigami.Theme.textColor.b, 0.85)
+            strokeWidth: ring.thickness
+            capStyle: ShapePath.RoundCap
+
+            PathAngleArc {
+                centerX: ring.width / 2
+                centerY: ring.height / 2
+                radiusX: ring.radius
+                radiusY: ring.radius
+                startAngle: -90
+                sweepAngle: 72
+            }
+        }
+
+        RotationAnimator on rotation {
+            from: 0
+            to: 360
+            duration: ring.orbitMs
+            loops: Animation.Infinite
+            running: orbit.visible
         }
     }
 }

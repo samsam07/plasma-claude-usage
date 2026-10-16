@@ -1,8 +1,10 @@
 /*
- * The spark Claude Code cycles through while it works — · ✢ ✳ ✶ ✻ ✽ and back
- * — in Claude orange. It keeps cycling even with Plasma's animations set to
- * Instant, as Plasma's own busy indicators do: it says work is under way. The
- * widget's own setting is what turns it off.
+ * The spark shown while Claude Code works, in Claude orange, in one of two
+ * styles: "frames", the spark Claude Code itself steps through — · ✢ ✳ ✶ ✻ ✽
+ * and back; or "wave", one spark whose eight rays swell in a wave that
+ * travels round it, drawn continuously. Either keeps moving even with
+ * Plasma's animations set to Instant, as Plasma's own busy indicators do: it
+ * says work is under way. The widget's own setting is what turns it off.
  *
  * Drawn rather than set as text: the glyphs come from different fonts that
  * report their extents unreliably, so as text they could not be kept centred
@@ -20,10 +22,14 @@ Canvas {
     required property color color
     // Diameter of the largest frame.
     property real size: Kirigami.Units.iconSizes.small
+    property string style: "frames"
 
     // Indexes into the shapes drawn in onPaint, there and back again.
     readonly property var frames: [0, 1, 2, 3, 4, 5, 4, 3, 2, 1]
     property int frame: 0
+    // How far round the wave has travelled, 0 to 1.
+    property real phase: 0
+    readonly property int waveMs: 1400
 
     readonly property bool animating: running && visible
     // Standing still, the dot would be all but invisible; show the full spark.
@@ -33,6 +39,8 @@ Canvas {
     implicitHeight: size
 
     onShapeChanged: requestPaint()
+    onPhaseChanged: requestPaint()
+    onStyleChanged: requestPaint()
     onColorChanged: requestPaint()
     onSizeChanged: requestPaint()
     onWidthChanged: requestPaint()
@@ -69,6 +77,19 @@ Canvas {
         ctx.fillStyle = color;
         ctx.strokeStyle = color;
         var i;
+
+        if (style === "wave") {
+            // Each ray's length follows a sine wave offset by its angle, so a
+            // swell travels clockwise and the outline never jumps.
+            var turn = phase * 2 * Math.PI;
+            dot(ctx, 0, 0, r * 0.13);
+            for (i = 0; i < 8; i++) {
+                var angle = i * Math.PI / 4;
+                var swell = 0.5 + 0.5 * Math.sin(turn - angle);
+                teardrop(ctx, angle, r * 0.15, r * (0.42 + 0.42 * swell), r * 0.12, r * 0.035);
+            }
+            return;
+        }
 
         switch (shape) {
         case 0: // ·
@@ -118,7 +139,18 @@ Canvas {
         // A full cycle in 3.75 s: calm enough to sit in the panel all day.
         interval: 375
         repeat: true
-        running: spinner.animating
+        running: spinner.animating && spinner.style === "frames"
         onTriggered: spinner.frame = (spinner.frame + 1) % spinner.frames.length
+    }
+
+    // About 30 frames a second: smooth at panel size, light on the CPU. The
+    // wave goes by the clock, so a late tick never slows it down.
+    Timer {
+        property double started: 0
+        interval: 33
+        repeat: true
+        running: spinner.animating && spinner.style === "wave"
+        onRunningChanged: started = Date.now() - spinner.phase * spinner.waveMs
+        onTriggered: spinner.phase = ((Date.now() - started) / spinner.waveMs) % 1
     }
 }
