@@ -104,7 +104,7 @@ PlasmoidItem {
         },
         PlasmaCore.Action {
             text: i18n("Open Usage on claude.ai")
-            icon.name: "internet-web-browser"
+            icon.name: "globe-symbolic"
             onTriggered: Qt.openUrlExternally(root.usagePage)
         }
     ]

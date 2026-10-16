@@ -29,11 +29,15 @@ PlasmaExtras.Representation {
 
     Layout.minimumWidth: Kirigami.Units.gridUnit * 18
     Layout.preferredWidth: Kirigami.Units.gridUnit * 20
-    Layout.minimumHeight: Kirigami.Units.gridUnit * 14
+    // Plasma restores the popup's last size over the preferred one, so only the
+    // minimum is sure to hold — it has to fit the placeholder when there is no data.
+    Layout.minimumHeight: Math.max(Kirigami.Units.gridUnit * 14, applet.hasData ? 0
+        : placeholder.implicitHeight + Kirigami.Units.gridUnit * 2 + chromeHeight)
     // Tall enough for everything, up to a point; past that the body scrolls.
     Layout.preferredHeight: Math.max(Layout.minimumHeight, Math.min(Kirigami.Units.gridUnit * 38,
-        body.implicitHeight + Kirigami.Units.largeSpacing * 2
-        + (header ? header.implicitHeight : 0) + (footer ? footer.implicitHeight : 0)))
+        body.implicitHeight + Kirigami.Units.largeSpacing * 2 + chromeHeight))
+
+    readonly property real chromeHeight: (header ? header.implicitHeight : 0) + (footer ? footer.implicitHeight : 0)
 
     collapseMarginsHint: true
 
@@ -74,6 +78,7 @@ PlasmaExtras.Representation {
 
     // Nothing cached and nothing fetched — say why, and offer a way forward.
     PlasmaExtras.PlaceholderMessage {
+        id: placeholder
         anchors.centerIn: parent
         width: parent.width - Kirigami.Units.gridUnit * 3
         visible: !full.applet.hasData && !full.applet.loading
@@ -110,11 +115,6 @@ PlasmaExtras.Representation {
             default:
                 return full.applet.errorText !== "" ? full.applet.errorText : i18n("Usage has not been loaded yet.");
             }
-        }
-        helpfulAction: Kirigami.Action {
-            text: i18n("Refresh")
-            icon.name: "view-refresh"
-            onTriggered: full.applet.refresh()
         }
     }
 
@@ -347,7 +347,7 @@ PlasmaExtras.Representation {
             }
 
             PlasmaComponents3.ToolButton {
-                icon.name: "internet-web-browser"
+                icon.name: "globe-symbolic"
                 display: PlasmaComponents3.AbstractButton.IconOnly
                 text: i18n("Open Usage on claude.ai")
                 onClicked: Qt.openUrlExternally(full.applet.usagePage)
