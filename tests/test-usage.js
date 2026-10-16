@@ -175,6 +175,74 @@ check("busiest", trend.busiest.peak, 92);
 check("empty history", sessionTrend(null, utc(2026, 8, 17, 9, 0, 0), WARN, CRIT).bars.length, 0);
 check("empty history has no busiest", sessionTrend(null, utc(2026, 8, 17, 9, 0, 0), WARN, CRIT).busiest, "null");
 
+print("\nsamples and hours (TZ=UTC)");
+{
+    const R = utc(2026, 8, 17, 13, 0, 0);   // window 08:00–13:00
+    const at = (h, m) => utc(2026, 8, 17, h, m, 0);
+    let h = recordSession(parseHistory(""), { resetsAt: R, percent: 30 }, at(9, 30));
+    check("first sample", h.samples.map(s => s.percent).join(","), "30");
+    check("spent since the window began, spread by hour", h.hours.map(x => x.used).join(","), "20,10");
+    check("recording starts with the window", new Date(h.hoursSince).toISOString(), "2026-09-17T08:00:00.000Z");
+    h = recordSession(h, { resetsAt: R + 400, percent: 40 }, at(10, 0));
+    check("same window despite jitter", h.samples.length, 2);
+    check("the rise goes to the hour it happened in", h.hours.map(x => x.used).join(","), "20,20");
+    h = recordSession(h, { resetsAt: R, percent: 40 }, at(10, 20));
+    check("no rise, nothing spent", h.hours.map(x => x.used).join(","), "20,20");
+    const later = recordSession(h, { resetsAt: utc(2026, 8, 17, 18, 0, 0), percent: 6 }, at(13, 30));
+    check("a new window starts its samples afresh", later.samples.map(s => s.percent).join(","), "6");
+    check("and spends from its own start", later.hours.map(x => new Date(x.start).getUTCHours() + ":" + x.used).join(","), "8:20,9:20,13:6");
+    check("round-trips through JSON", parseHistory(JSON.stringify(later)).hours.length, 3);
+    check("an older history has no samples", parseHistory(JSON.stringify({ since: 5, windows: [] })).samples.length, 0);
+    check("all of it to one hour when no time passed", spreadOverHours([], at(9, 0), at(9, 0), 5).map(x => x.used).join(","), "5");
+
+    print("\nheatmap (TZ=UTC)");
+    const heat = usageHeatmap(later, at(13, 30));
+    const today = heat.rows[6].cells;
+    check("seven rows of 24 hours", heat.rows.length + "x" + today.length, "7x24");
+    check("hours filled in", today[8].used + "," + today[9].used + "," + today[13].used, "20,20,6");
+    check("scaled against the busiest hour", today[13].ratio, 0.3);
+    check("before recording began is unknown", today[7].known, false);
+    check("recorded hours are known", today[8].known, true);
+    check("hours still to come are unknown", today[14].known, false);
+    check("empty history", usageHeatmap(null, at(13, 30)).max, 0);
+
+    print("\nsession pace (TZ=UTC)");
+    const row = (percent) => ({ kind: "session", percent: percent, resetsAt: R, hasReset: false });
+    let history = recordSession(parseHistory(""), { resetsAt: R, percent: 30 }, at(9, 30));
+    history = recordSession(history, { resetsAt: R, percent: 45 }, at(10, 30));
+    let progress = sessionProgress(history, row(45), at(10, 30), at(10, 31));
+    check("starts at 0% when the window began", progress.points[0].percent + "@" + new Date(progress.points[0].t).getUTCHours(), "0@8");
+    check("then each figure", progress.points.map(p => p.percent).join(","), "0,30,45");
+    check("rate over the last hour", Math.round(progress.pace.rate * HOUR_MS), 15);
+    check("short of the limit by the reset", Math.floor(progress.pace.atReset), 82);
+    check("so no limit time", progress.pace.limitAt, 0);
+    history = recordSession(recordSession(parseHistory(""), { resetsAt: R, percent: 30 }, at(9, 30)), { resetsAt: R, percent: 60 }, at(10, 30));
+    progress = sessionProgress(history, row(60), at(10, 30), at(10, 31));
+    check("faster, it hits the limit before the reset", new Date(progress.pace.limitAt).toISOString(), "2026-09-17T11:50:00.000Z");
+    history = recordSession(parseHistory(""), { resetsAt: R, percent: 3 }, at(8, 10));
+    check("unknown over a few minutes", sessionProgress(history, row(3), at(8, 10), at(8, 11)).pace, "null");
+    check("a newer figure on screen is added", sessionProgress(history, row(5), at(8, 20), at(8, 21)).points.map(p => p.percent).join(","), "0,3,5");
+    check("limit reached", sessionProgress(history, row(100), at(8, 20), at(8, 21)).pace.reached, true);
+    check("no session, no progress", sessionProgress(history, { kind: "session", percent: 0, resetsAt: 0, hasReset: false }, 0, at(8, 21)), "null");
+
+    print("\nweek pace (TZ=UTC)");
+    const W = utc(2026, 8, 23, 15, 0, 0);   // the week from 16 Sep 15:00
+    const week = (percent) => ({ kind: "weekly", percent: percent, resetsAt: W, hasReset: false });
+    let pace = weekPace(week(41), utc(2026, 8, 17, 15, 0, 0));
+    check("a day in, a seventh gone", pace.elapsed.toFixed(3), "0.143");
+    check("41% is ahead", pace.ahead, true);
+    check("runs out about 58.5 h into the week", ((pace.outAt - (W - WEEK_MS)) / HOUR_MS).toFixed(1), "58.5");
+    pace = weekPace(week(10), utc(2026, 8, 17, 15, 0, 0));
+    check("10% is under pace", pace.ahead + "," + pace.outAt, "false,0");
+    check("not known in the first hours", weekPace(week(5), utc(2026, 8, 16, 17, 0, 0)).known, false);
+
+    print("\nproduct split");
+    const split = productSplit(parse(load(here + "/fixture-usage.json")).breakdown);
+    check("shares", split.shares.map(p => p.name).join(","), "Claude Code,Chats");
+    check("products with none", split.unused.join(","), "Cowork,Other");
+    check("no breakdown", productSplit(null).shares.length, 0);
+}
+
 print("\ndurations");
 check("minutes", formatDuration(45 * 60000), "45 min");
 check("rounds up", formatDuration(20000), "1 min");

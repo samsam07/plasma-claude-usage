@@ -262,19 +262,14 @@ ColumnLayout {
                 return chart.readoutFor(chart.selectedBar);
             }
             if (chart.trend.busiest) {
-                return i18nc("the session with the highest usage", "Busiest: %1", chart.readoutFor(chart.trend.busiest));
+                var busiest = i18nc("the session with the highest usage", "Busiest: %1", chart.readoutFor(chart.trend.busiest));
+                var since = chart.applet.sessionHistory.since;
+                return since > 0
+                    ? i18nc("the busiest session, then since when this widget has recorded them", "%1 · tracked since %2",
+                            busiest, Qt.locale().toString(new Date(since), "d MMM"))
+                    : busiest;
             }
             return "";
         }
-    }
-
-    PlasmaComponents3.Label {
-        Layout.fillWidth: true
-        visible: chart.applet.sessionHistory.since > 0
-        text: i18n("Recorded by this widget since %1",
-                   Qt.locale().toString(new Date(chart.applet.sessionHistory.since), "ddd d MMM"))
-        font: Kirigami.Theme.smallFont
-        color: Kirigami.Theme.disabledTextColor
-        wrapMode: Text.Wrap
     }
 }

@@ -21,7 +21,7 @@ KCM.SimpleKCM {
     property alias cfg_showSettingsButton: showSettingsButtonBox.checked
     property alias cfg_animateLogo: animateLogoBox.checked
     property alias cfg_sessionsBusyOnly: busyOnlyBox.checked
-    property alias cfg_sessionCount: sessionCountField.value
+    property string cfg_historyChart
 
     Kirigami.FormLayout {
         anchors.fill: parent
@@ -65,27 +65,27 @@ KCM.SimpleKCM {
         QQC2.CheckBox {
             id: showMainLimitBox
             Kirigami.FormData.label: i18n("Popup shows:")
-            text: i18n("The ring's limit")
+            text: i18n("Current session")
         }
 
         QQC2.CheckBox {
             id: showOtherLimitsBox
-            text: i18n("Other limits and usage credits")
+            text: i18n("This week's limits and usage credits")
         }
 
         QQC2.CheckBox {
             id: showProductsBox
-            text: i18n("This week's usage by product")
+            text: i18n("This week by product")
         }
 
         QQC2.CheckBox {
             id: showSessionsBox
-            text: i18n("Recent Claude Code sessions")
+            text: i18n("Claude Code sessions")
         }
 
         QQC2.CheckBox {
             id: showTrendBox
-            text: i18n("Seven-day session trend")
+            text: i18n("The last seven days")
         }
 
         QQC2.CheckBox {
@@ -104,17 +104,25 @@ KCM.SimpleKCM {
             text: i18n("Only those working on a task")
         }
 
-        QQC2.SpinBox {
-            id: sessionCountField
-            Kirigami.FormData.label: i18n("Show up to:")
-            enabled: showSessionsBox.checked
-            from: 1
-            to: 20
-            editable: true
-            textFromValue: (value, locale) => i18np("%1 session", "%1 sessions", value)
-            valueFromText: (text, locale) => {
-                var n = parseInt(text, 10);
-                return isNaN(n) ? sessionCountField.value : n;
+        QQC2.ComboBox {
+            id: historyBox
+            Kirigami.FormData.label: i18n("Last seven days as:")
+            enabled: showTrendBox.checked
+
+            textRole: "label"
+            valueRole: "value"
+            model: [
+                { value: "heatmap", label: i18n("When you use Claude, by the hour") },
+                { value: "bars", label: i18n("Each session's peak") }
+            ]
+
+            onActivated: page.cfg_historyChart = currentValue
+
+            Component.onCompleted: {
+                currentIndex = indexOfValue(page.cfg_historyChart);
+                if (currentIndex < 0) {
+                    currentIndex = 0;
+                }
             }
         }
 

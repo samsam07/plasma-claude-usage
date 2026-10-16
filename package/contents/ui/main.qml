@@ -61,9 +61,15 @@ PlasmoidItem {
     readonly property var credits: hasData ? usage.credits : null
     readonly property var breakdown: hasData ? usage.breakdown : null
 
-    // Peak of each session window, as recorded by this widget; see recordSession().
-    property var sessionHistory: ({ since: 0, windows: [] })
+    // The popup always leads with the session, whichever limit the ring shows.
+    readonly property var sessionRow: rows.find(row => row.kind === "session") || null
+    readonly property var weekRows: rows.filter(row => row.kind !== "session")
+
+    // What this widget has recorded of past fetches; see recordSession().
+    property var sessionHistory: Usage.emptyHistory()
     readonly property var trend: Usage.sessionTrend(sessionHistory, now, warningPercent, criticalPercent)
+    readonly property var heatmap: Usage.usageHeatmap(sessionHistory, now)
+    readonly property var progress: Usage.sessionProgress(sessionHistory, sessionRow, lastFetch, now)
     readonly property string lastFetchText: lastFetch > 0
         ? Qt.formatTime(new Date(lastFetch), Qt.locale(), Locale.ShortFormat)
         : ""
@@ -153,6 +159,93 @@ PlasmoidItem {
         }
         return i18nc("%1 is a day such as 'Wed 23 Sep', %2 a time", "Resets %1, %2",
                      Qt.locale().toString(at, "ddd d MMM"), clock);
+    }
+
+    // The popup's shorter names: the section heading says "This week".
+    function shortTitleFor(row) {
+        if (!row) {
+            return "";
+        }
+        switch (row.kind) {
+        case "session":
+            return i18n("Current session");
+        case "weekly":
+            return i18n("All models");
+        default:
+            return row.model;
+        }
+    }
+
+    function clockText(ms) {
+        return Qt.formatTime(new Date(ms), Qt.locale(), Locale.ShortFormat);
+    }
+
+    // "Resets 16:45 · in 2 h 13 min", the time bold in `strong`; styled text.
+    function sessionResetText(row, strong) {
+        if (!row || row.resetsAt <= 0) {
+            return "";
+        }
+        if (row.hasReset) {
+            return i18n("Reset at %1", clockText(row.resetsAt));
+        }
+        return i18nc("reset time, then how long until then", "Resets %1 · in %2",
+                     "<b><font color=\"" + strong + "\">" + clockText(row.resetsAt) + "</font></b>",
+                     Usage.formatDuration(row.resetsAt - now, durationUnits));
+    }
+
+    // The line under "Current session" when none is under way.
+    function sessionIdleText(row) {
+        if (row && row.hasReset) {
+            return i18n("Reset at %1", clockText(row.resetsAt));
+        }
+        return i18n("Starts with your next message");
+    }
+
+    // "Resets in 5 h 2 min" when under a day away, otherwise "Resets Wed 19:00".
+    function weekResetText(row) {
+        if (!row || row.resetsAt <= 0) {
+            return "";
+        }
+        if (row.hasReset) {
+            return i18n("Reset at %1", clockText(row.resetsAt));
+        }
+        var remaining = row.resetsAt - now;
+        if (remaining < 24 * 3600000) {
+            return i18n("Resets in %1", Usage.formatDuration(remaining, durationUnits));
+        }
+        return i18nc("%1 is a short day such as 'Wed', %2 a time", "Resets %1 %2",
+                     Qt.locale().toString(new Date(row.resetsAt), "ddd"), clockText(row.resetsAt));
+    }
+
+    function sessionPaceText(pace) {
+        if (!pace) {
+            return "";
+        }
+        if (pace.reached) {
+            return i18n("Limit reached");
+        }
+        if (pace.limitAt > 0) {
+            return i18nc("%1 is a time", "Limit ~%1 at this pace", clockText(pace.limitAt));
+        }
+        return i18nc("%1 is a percentage", "~%1 by reset at this pace", Usage.percentText(pace.atReset));
+    }
+
+    function weekPaceText(pace) {
+        if (!pace || !pace.known) {
+            return "";
+        }
+        if (!pace.ahead) {
+            return i18n("Under pace");
+        }
+        return i18nc("%1 is a day and time such as 'Sun 05:00'", "Ahead of pace · out ~%1",
+                     Qt.locale().toString(new Date(pace.outAt), "ddd") + " " + clockText(pace.outAt));
+    }
+
+    // "Tue 10:00–15:00" for one session window.
+    function shortWindowText(bar) {
+        return i18nc("day, then start and end times", "%1 %2–%3",
+                     Qt.locale().toString(new Date(bar.start), "ddd"),
+                     clockText(bar.start), clockText(bar.end));
     }
 
     // "Thu 17 Sep, 08:00–13:00" for one session window of the trend.
@@ -324,11 +417,10 @@ PlasmoidItem {
     }
 
     // What the popup lists: working ones first, then the most recently active,
-    // or only the working ones, up to the number chosen in the settings.
-    readonly property var recentSessions: (Plasmoid.configuration.sessionsBusyOnly
-            ? sessions.filter(session => session.status === "busy")
-            : sessions)
-        .slice(0, Math.max(1, Plasmoid.configuration.sessionCount))
+    // or only the working ones. The popup shows as many as it has room for.
+    readonly property var recentSessions: Plasmoid.configuration.sessionsBusyOnly
+        ? sessions.filter(session => session.status === "busy")
+        : sessions
     // The panel's Claude mark animates while any session is working.
     readonly property bool anyBusy: sessions.some(session => session.status === "busy")
 
@@ -651,7 +743,7 @@ PlasmoidItem {
     onCredentialsPathChanged: {
         account = "";
         usage = null;
-        sessionHistory = { since: 0, windows: [] };
+        sessionHistory = Usage.emptyHistory();
         plan = "";
         authState = "unknown";
         errorText = "";

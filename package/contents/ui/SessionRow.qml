@@ -1,6 +1,6 @@
 /*
- * One running Claude Code session: a status dot, its name, and beneath it the
- * project folder and how long it has been running; busy or idle on the right.
+ * One running Claude Code session on one line: a dot when idle or the spark
+ * when busy, its name, and how it is doing.
  */
 
 import QtQuick
@@ -13,24 +13,21 @@ RowLayout {
     id: session
 
     property string name
-    property string folder
-    property string runningText
     property string status
+    // How long a busy session has been running; empty for none.
+    property string runningText
     // Claude orange for the theme in use.
     required property color busyColor
     // Off while the popup is closed, so a hidden row does not keep drawing.
     property bool animate: true
 
     readonly property bool busy: status === "busy"
-    readonly property color statusColor: busy ? busyColor : Kirigami.Theme.disabledTextColor
+    readonly property real indicatorWidth: rowSpinner.size
 
     spacing: Kirigami.Units.largeSpacing
 
-    // A dot when idle; when busy, the spark Claude Code cycles through while
-    // it works.
     Item {
-        Layout.alignment: Qt.AlignTop
-        implicitWidth: rowSpinner.size
+        implicitWidth: session.indicatorWidth
         implicitHeight: nameLabel.implicitHeight
 
         Rectangle {
@@ -39,7 +36,7 @@ RowLayout {
             width: Kirigami.Units.smallSpacing * 2
             height: width
             radius: width / 2
-            color: session.statusColor
+            color: Kirigami.Theme.disabledTextColor
         }
 
         ClaudeSpinner {
@@ -52,42 +49,24 @@ RowLayout {
         }
     }
 
-    ColumnLayout {
+    PlasmaComponents3.Label {
+        id: nameLabel
         Layout.fillWidth: true
-        spacing: 0
-
-        PlasmaComponents3.Label {
-            id: nameLabel
-            Layout.fillWidth: true
-            text: session.name !== "" ? session.name : i18n("Claude Code session")
-            elide: Text.ElideRight
-            maximumLineCount: 1
-        }
-
-        PlasmaComponents3.Label {
-            Layout.fillWidth: true
-            visible: text !== ""
-            text: session.folder !== "" && session.runningText !== ""
-                ? i18nc("project folder · how long it has been running", "%1 · %2",
-                        session.folder, session.runningText)
-                : session.folder + session.runningText
-            font: Kirigami.Theme.smallFont
-            color: Kirigami.Theme.disabledTextColor
-            // Keep the start of the path and the running time; drop the middle.
-            elide: Text.ElideMiddle
-            maximumLineCount: 1
-        }
+        text: session.name !== "" ? session.name : i18n("Claude Code session")
+        elide: Text.ElideRight
+        maximumLineCount: 1
     }
 
     // Only the states Claude Code is known to write; anything else is an
     // internal word that would show untranslated, so it is left out.
     PlasmaComponents3.Label {
-        Layout.alignment: Qt.AlignTop
         visible: text !== ""
         text: {
             switch (session.status) {
             case "busy":
-                return i18nc("a Claude Code session is working", "Busy");
+                return session.runningText !== ""
+                    ? i18nc("a Claude Code session is working, then for how long", "Busy · %1", session.runningText)
+                    : i18nc("a Claude Code session is working", "Busy");
             case "idle":
                 return i18nc("a Claude Code session is waiting", "Idle");
             default:
@@ -95,6 +74,6 @@ RowLayout {
             }
         }
         font: Kirigami.Theme.smallFont
-        color: session.statusColor
+        color: session.busy ? session.busyColor : Kirigami.Theme.disabledTextColor
     }
 }

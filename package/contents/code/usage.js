@@ -342,11 +342,18 @@ function pickRing(rowList, mode) {
 
 /*
  * The service reports only the current window, so the widget keeps its own
- * history: one entry per session window, holding the window's reset time and
- * the highest percentage any fetch saw in it.
+ * history, built from every successful fetch:
+ *   windows       one entry per session window: its reset time and the
+ *                 highest percentage any fetch saw in it, for the bars
+ *   samples       each fetch's figure in the window ending at sampleWindow,
+ *                 for the session chart and its pace
+ *   hours         how many percentage points of the session limit went in
+ *                 each local hour, from hoursSince on, for the heatmap
  */
 
 var SESSION_MS = 5 * 3600000;
+var WEEK_MS = 7 * 86400000;
+var HOUR_MS = 3600000;
 var TREND_DAYS = 7;
 
 // Kept a day past the chart, so a window straddling its left edge survives.
@@ -356,22 +363,78 @@ var HISTORY_MS = (TREND_DAYS + 1) * 86400000;
 // a second ("12:59:59.838", then "13:00:00.335").
 var SAME_WINDOW_MS = 10 * 60000;
 
+function emptyHistory() {
+    return { since: 0, windows: [], sampleWindow: 0, samples: [], hoursSince: 0, hours: [] };
+}
+
 function parseHistory(text) {
-    var empty = { since: 0, windows: [] };
+    var history = emptyHistory();
     try {
         var data = JSON.parse(text);
         if (!data || !Array.isArray(data.windows)) {
-            return empty;
+            return history;
         }
-        return {
-            since: typeof data.since === "number" ? data.since : 0,
-            windows: data.windows.filter(function (w) {
-                return w && typeof w.resetsAt === "number" && typeof w.peak === "number";
-            })
-        };
+        history.since = typeof data.since === "number" ? data.since : 0;
+        history.windows = data.windows.filter(function (w) {
+            return w && typeof w.resetsAt === "number" && typeof w.peak === "number";
+        });
+        // Histories from before samples and hours were kept have neither.
+        if (typeof data.sampleWindow === "number" && Array.isArray(data.samples)) {
+            history.sampleWindow = data.sampleWindow;
+            history.samples = data.samples.filter(function (s) {
+                return s && typeof s.t === "number" && typeof s.percent === "number";
+            });
+        }
+        if (typeof data.hoursSince === "number" && Array.isArray(data.hours)) {
+            history.hoursSince = data.hoursSince;
+            history.hours = data.hours.filter(function (h) {
+                return h && typeof h.start === "number" && typeof h.used === "number";
+            });
+        }
     } catch (e) {
-        return empty;
+        // An unreadable history starts again.
     }
+    return history;
+}
+
+function hourStart(ms) {
+    var date = new Date(ms);
+    date.setMinutes(0, 0, 0);
+    return date.getTime();
+}
+
+/*
+ * Adds `amount` to the hours from `from` to `to`, in proportion to how much of
+ * that time each hour holds. With no time between them, all of it goes to the
+ * hour of `to`. Returns a new list, oldest hour first.
+ */
+function spreadOverHours(hours, from, to, amount) {
+    var list = hours.map(function (h) { return { start: h.start, used: h.used }; });
+    if (!(amount > 0)) {
+        return list;
+    }
+    function add(start, value) {
+        for (var i = 0; i < list.length; i++) {
+            if (list[i].start === start) {
+                list[i].used = Math.round((list[i].used + value) * 1000) / 1000;
+                return;
+            }
+        }
+        list.push({ start: start, used: Math.round(value * 1000) / 1000 });
+    }
+    if (to <= from) {
+        add(hourStart(to), amount);
+    } else {
+        var t = from;
+        while (t < to) {
+            var start = hourStart(t);
+            var next = Math.min(to, start + HOUR_MS);
+            add(start, amount * (next - t) / (to - from));
+            t = next;
+        }
+    }
+    list.sort(function (a, b) { return a.start - b.start; });
+    return list;
 }
 
 // The current session's figure, if a session is under way.
@@ -396,8 +459,19 @@ function recordSession(history, sample, now) {
         return w.resetsAt > now - HISTORY_MS;
     });
     var since = history.since > 0 ? history.since : now;
+    var hours = (history.hours || []).filter(function (h) {
+        return h.start > now - HISTORY_MS;
+    });
+    var next = {
+        since: since,
+        windows: windows,
+        sampleWindow: history.sampleWindow || 0,
+        samples: history.samples || [],
+        hoursSince: history.hoursSince > 0 ? history.hoursSince : now,
+        hours: hours
+    };
     if (!sample) {
-        return { since: since, windows: windows };
+        return next;
     }
 
     var merged = false;
@@ -412,15 +486,31 @@ function recordSession(history, sample, now) {
         windows.push({ resetsAt: sample.resetsAt, peak: sample.percent });
     }
     windows.sort(function (a, b) { return a.resetsAt - b.resetsAt; });
-    return { since: since, windows: windows };
+    next.windows = windows;
+
+    // A new window starts its samples afresh, from 0% when it began.
+    if (next.sampleWindow === 0 || Math.abs(next.sampleWindow - sample.resetsAt) >= SAME_WINDOW_MS) {
+        next.sampleWindow = sample.resetsAt;
+        next.samples = [];
+    }
+    var start = next.sampleWindow - SESSION_MS;
+    var last = next.samples.length > 0
+        ? next.samples[next.samples.length - 1]
+        : { t: start, percent: 0 };
+    // What went since the last figure is spread over the time between them,
+    // as nothing says when within it.
+    var from = Math.max(start, last.t);
+    next.hours = spreadOverHours(hours, from, now, sample.percent - last.percent);
+    if (!(history.hoursSince > 0)) {
+        next.hoursSince = Math.min(from, now);
+    }
+    next.samples = next.samples.concat([{ t: now, percent: sample.percent }]);
+    return next;
 }
 
-/*
- * The chart: the last seven local days, today included, one bar per session
- * window placed at the time it ran. `days` holds each day's start, plus the end
- * of today. Walking the dates keeps days with a DST change the right length.
- */
-function sessionTrend(history, now, warningPercent, criticalPercent) {
+// The start of each of the last seven local days, today last, plus the end of
+// today. Walking the dates keeps days with a DST change the right length.
+function trendDays(now) {
     var days = [];
     var date = new Date(now);
     date.setHours(0, 0, 0, 0);
@@ -429,6 +519,15 @@ function sessionTrend(history, now, warningPercent, criticalPercent) {
         days.push(date.getTime());
         date.setDate(date.getDate() + 1);
     }
+    return days;
+}
+
+/*
+ * The bars: the last seven local days, today included, one bar per session
+ * window placed at the time it ran.
+ */
+function sessionTrend(history, now, warningPercent, criticalPercent) {
+    var days = trendDays(now);
     var from = days[0];
     var to = days[TREND_DAYS];
 
@@ -457,6 +556,136 @@ function sessionTrend(history, now, warningPercent, criticalPercent) {
     });
 
     return { from: from, to: to, days: days, bars: bars, busiest: busiest };
+}
+
+/*
+ * The heatmap: the same seven days, one row each, today last, with how much
+ * of the session limit went in each of their 24 hours. `ratio` scales each
+ * hour against the busiest one, so the busiest is always the strongest colour.
+ */
+function usageHeatmap(history, now) {
+    var days = trendDays(now);
+    var used = {};
+    var max = 0;
+    (history && history.hours ? history.hours : []).forEach(function (h) {
+        used[h.start] = h.used;
+        max = Math.max(max, h.used);
+    });
+    var since = history && history.hoursSince > 0 ? history.hoursSince : now;
+    var rows = [];
+    for (var d = 0; d < TREND_DAYS; d++) {
+        var cells = [];
+        for (var hour = 0; hour < 24; hour++) {
+            var date = new Date(days[d]);
+            date.setHours(hour);
+            var start = date.getTime();
+            var value = used[start] || 0;
+            cells.push({
+                start: start,
+                used: value,
+                ratio: max > 0 ? value / max : 0,
+                // Before recording began nothing is known, which is not the
+                // same as nothing used.
+                known: start + HOUR_MS > since && start <= now
+            });
+        }
+        rows.push({ start: days[d], cells: cells });
+    }
+    return { rows: rows, max: max };
+}
+
+/*
+ * The session under way, for its chart: the figures fetched in it, starting
+ * from 0% when it began, and where the rate of the last hour leads. A line
+ * through only a few minutes swings wildly, so until the figures span
+ * PACE_MIN_MS the pace stays unknown (null).
+ */
+var PACE_SPAN_MS = HOUR_MS;
+var PACE_MIN_MS = 15 * 60000;
+
+function sessionProgress(history, row, fetchedAt, now) {
+    if (!row || row.kind !== "session" || row.resetsAt <= 0 || row.hasReset) {
+        return null;
+    }
+    var end = row.resetsAt;
+    var start = end - SESSION_MS;
+    var points = [{ t: start, percent: 0 }];
+    if (history && history.sampleWindow > 0 && Math.abs(history.sampleWindow - end) < SAME_WINDOW_MS) {
+        history.samples.forEach(function (s) {
+            if (s.t > start && s.t <= now) {
+                points.push({ t: s.t, percent: s.percent });
+            }
+        });
+    }
+    // The figure on screen may be newer than the last one recorded.
+    var newest = points[points.length - 1];
+    if (newest.percent !== row.percent && fetchedAt > newest.t) {
+        newest = { t: Math.min(fetchedAt, now), percent: row.percent };
+        points.push(newest);
+    }
+
+    var pace = null;
+    if (row.percent >= 100) {
+        pace = { reached: true, rate: 0, limitAt: 0, atReset: 100 };
+    } else {
+        // The last figure at least an hour older than the newest, or failing
+        // that the start of the window.
+        var base = points[0];
+        for (var i = points.length - 2; i >= 0; i--) {
+            if (points[i].t <= newest.t - PACE_SPAN_MS) {
+                base = points[i];
+                break;
+            }
+        }
+        var span = newest.t - base.t;
+        if (span >= PACE_MIN_MS) {
+            var rate = Math.max(0, newest.percent - base.percent) / span;
+            var limitAt = rate > 0 ? newest.t + (100 - newest.percent) / rate : 0;
+            pace = {
+                reached: false,
+                rate: rate,
+                // When the limit would be hit, if before the reset; 0 if not.
+                limitAt: limitAt > 0 && limitAt < end ? limitAt : 0,
+                atReset: Math.min(100, newest.percent + rate * (end - newest.t))
+            };
+        }
+    }
+    return { start: start, end: end, points: points, newest: newest, pace: pace };
+}
+
+/*
+ * A weekly limit against the week gone by: `elapsed` is the share of the
+ * week past, and a limit used faster than that is ahead of pace. At its
+ * average rate since the week began it then runs out at `outAt`, before the
+ * reset. In the first hours of a week a few messages would read as far ahead,
+ * so the pace is only `known` after WEEK_PACE_MIN_MS.
+ */
+var WEEK_PACE_MIN_MS = 6 * HOUR_MS;
+
+function weekPace(row, now) {
+    if (!row || row.resetsAt <= 0 || row.hasReset) {
+        return null;
+    }
+    var start = row.resetsAt - WEEK_MS;
+    var elapsed = Math.max(0, Math.min(1, (now - start) / WEEK_MS));
+    var known = now - start >= WEEK_PACE_MIN_MS;
+    var ahead = known && row.percent > elapsed * 100 && row.percent < 100;
+    return {
+        elapsed: elapsed,
+        known: known,
+        ahead: ahead,
+        outAt: ahead ? start + (now - start) * 100 / row.percent : 0
+    };
+}
+
+// The split bar's shares, in the service's order, and the names of products
+// with none, which share a single label.
+function productSplit(breakdown) {
+    var list = breakdown || [];
+    return {
+        shares: list.filter(function (p) { return p.percent > 0; }),
+        unused: list.filter(function (p) { return !(p.percent > 0); }).map(function (p) { return p.name; })
+    };
 }
 
 // --------------------------------------------------------------- formatting

@@ -4,9 +4,10 @@
 
 Shows how much of your Claude plan's limits you have used, as a ring around the
 Claude mark in the system tray, next to the network and volume icons. Click it
-for every limit and when each one resets, this week's usage split by product,
-and a seven-day chart of your sessions. The figures are the ones Claude Code's
-`/usage` screen shows, read with Claude Code's own sign-in.
+for the current session with its pace, this week's limits, this week's usage
+split by product, your running Claude Code sessions, and when you used Claude
+over the last seven days. The figures are the ones Claude Code's `/usage`
+screen shows, read with Claude Code's own sign-in.
 
 The ring is Claude orange, then turns yellow and red as the limit fills.
 
@@ -47,11 +48,11 @@ Right-click the widget → **Configure Claude Usage…**
 
 | Setting | Default | Notes |
 | --- | --- | --- |
-| Ring shows | Current session | The 5-hour session, the week across all models, or whichever is closest to its limit |
+| Ring shows | Current session | The 5-hour session, the week across all models, or whichever is closest to its limit. The popup always leads with the session |
 | Panel icon: animate while a session is working | On | |
-| Popup shows | Everything | Each section can be hidden: the ring's limit, other limits and credits, usage by product, recent sessions, the trend, and the settings button. With the ring's limit hidden, it is listed with the other limits |
+| Popup shows | Everything | Each section can be hidden: the current session, this week's limits and credits, this week by product, Claude Code sessions, the last seven days, and the settings button |
 | Sessions: only those working | Off | |
-| Sessions: show up to | 3 | 1 to 20 |
+| Last seven days as | When you use Claude, by the hour | Or each session's peak, as bars |
 | Turn yellow at | 75% | |
 | Turn red at | 90% | |
 | Refresh every | 5 minutes | At least 2; see [Rate limit](#rate-limit) |
@@ -59,31 +60,49 @@ Right-click the widget → **Configure Claude Usage…**
 
 ## How it behaves
 
-- The ring shows one limit. The popup shows that limit large, then every
-  other limit as a bar, usage credits if you have them switched on, this
-  week's usage by product, your recent Claude Code sessions, and the session
-  chart.
+- The ring shows one limit. The popup leads with the current session, then
+  this week's limits, usage credits if you have them switched on, and this
+  week's usage by product. Below them, or in a second column once the popup is
+  600 px wide, come your Claude Code sessions, which take whatever room is
+  spare, and the last seven days at the bottom.
 - Percentages are rounded down, as Claude Code rounds them: 99.6% reads `99%`.
-- Resets under a day away read `Resets in 2 h 13 min`; further out,
-  `Resets Wed 23 Sep, 7:00 PM`.
+- The session reads `Resets 16:45 · in 2 h 13 min`. A weekly limit reads
+  `Resets in 5 h 2 min` when under a day away, otherwise `Resets Wed 19:00`.
 - Once a window's reset time passes, it drops to 0% straight away, and the
   widget fetches the new figures without waiting for the next refresh.
 - Opening the popup refreshes it if the figures are more than a minute old.
 
+### Current session and pace
+
+Next to the ring, a chart of the session so far: from 0% when the 5-hour
+window began, through every figure the widget fetched, to now. A dashed line
+carries on at the pace of the last hour, and the line under the chart says
+where it leads: `Limit ~16:06 at this pace` in yellow when that comes before
+the reset, otherwise `~80% by reset at this pace`. The pace waits for 15
+minutes of figures, as a line through a few minutes swings too much.
+
+Each weekly bar has a tick for how much of the week has gone. A limit used
+faster than that is `Ahead of pace`, with when it would run out at its average
+rate since the week began, such as `out ~Sun 05:00`; otherwise it is
+`Under pace`. A week's pace waits for its first 6 hours.
+
 ### Usage by product
 
 Claude Code, Chats, Cowork and Other, each as a share of this week's usage,
-exactly as claude.ai's usage page lists them. The shares add up to 100% of what
-you have used, not of your limit. The bars use your Plasma accent colour, so
-they don't look like the limit bars' orange, yellow and red.
+exactly as claude.ai's usage page lists them, in one split bar. The shares add
+up to 100% of what you have used, not of your limit. Products with no share
+are named together on one line. The bar uses your Plasma accent colour, so it
+doesn't look like the limit bars' orange, yellow and red.
 
-### Recent sessions
+### Claude Code sessions
 
 The Claude Code sessions open on this computer, working ones first, then the
-most recently active, each with its name, project folder and how long it has
-been running. While any of them is working, the panel icon becomes the spark
-Claude Code shows while it works. Like Plasma's own busy indicators, it keeps
-moving with Plasma's animations set to Instant; switch it off in the
+most recently active, one line each: its name, and `Busy` with how long it has
+been running, or `Idle`. The list shows as many as fit in the room it has,
+which is at least three lines, and counts the rest on the last line, such as
+`+2 idle sessions`. While any of them is working, the panel icon becomes the
+spark Claude Code shows while it works. Like Plasma's own busy indicators, it
+keeps moving with Plasma's animations set to Instant; switch it off in the
 widget's settings instead.
 
 They come from the files Claude Code keeps in `~/.claude/sessions`, one per
@@ -94,23 +113,28 @@ re-reads the directory every 3 seconds while the popup is open and every 10
 while it is closed, and stops when both the list and the panel animation are
 switched off.
 
-### Session chart
+### Last seven days
 
-One column per 5-hour session over the last seven days, placed at the time it
-ran and as tall as the highest percentage it reached. Its colour follows the
-same thresholds as the ring. Point at a column, or tab to the chart and use the
-arrow keys, to read its figure and times. Otherwise the line under the chart
-names the busiest session.
+By default, **when you use Claude**: one row per day, today last, and a cell
+per hour coloured by how much of the session limit went in that hour, the
+busiest hour strongest. The other choice in the settings is **each session's
+peak**: one column per 5-hour session, placed at the time it ran, as tall as
+the highest percentage it reached, and coloured by the same thresholds as the
+ring. Point at a cell or a column, or tab to the chart and use the arrow keys,
+to read it out. Otherwise the line under the chart names the busiest session.
 
 The usage service reports only the session in progress, so **the widget
-records this history itself**. Each refresh saves the current session's
-highest figure, and the widget checks once more just before a session resets
-to catch where it ended.
+records this history itself**. Each refresh saves the session's figure. What
+it rose by since the last refresh is spread over the time between them, hour
+by hour, as nothing says when within it. The widget also checks once more just
+before a session resets, to catch where it ended.
 
-- The chart starts empty and fills in over the first week. The stretch before
-  recording began is shaded.
+- The charts start empty and fill in over the first week. Hours before
+  recording began are drawn fainter, and the stretch before it is shaded.
 - Sessions that ran while the widget wasn't running (computer off, logged out)
   are missing, and look the same as sessions that never happened.
+- How finely the hours are told apart depends on **Refresh every**: at the
+  5-minute default, a rise is placed within 5 minutes.
 - The history is kept per account next to the cache, and trimmed to eight days.
 
 ### Rate limit
@@ -176,11 +200,14 @@ package/contents/
     ├── CompactRepresentation.qml  the ring in the panel or tray
     ├── FullRepresentation.qml     the popup
     ├── UsageRing.qml              the ring itself, used in both
+    ├── SessionChart.qml           the current session so far, and its pace
     ├── LimitRow.qml               one limit's bar in the popup
-    ├── ProductRow.qml             one product's share of the week
+    ├── ProductSplit.qml           this week's split by product
+    ├── SessionList.qml            the Claude Code sessions that fit
     ├── SessionRow.qml             one running Claude Code session
     ├── ClaudeSpinner.qml          the spark shown while a session works
-    ├── SessionTrend.qml           the seven-day session chart
+    ├── SessionHeatmap.qml         when you used Claude, by the hour
+    ├── SessionTrend.qml           each session's peak, as bars
     └── configGeneral.qml          the settings page
 ```
 
@@ -214,7 +241,7 @@ This is the request behind Claude Code's `/usage` screen. The response has
 `resets_at` time, and a `limits` array that adds a `severity` to each window,
 plus per-model weekly limits on plans that have them. `seven_day_breakdown`
 holds the week's split by product. It also reports usage credits when those
-are switched on. There is no history; see [Session chart](#session-chart).
+are switched on. There is no history; see [Last seven days](#last-seven-days).
 
 The endpoint is undocumented, so it can change without warning. If the widget
 stops updating, check it first. A failed fetch does not clear the widget: it

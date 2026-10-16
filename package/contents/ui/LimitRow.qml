@@ -1,5 +1,6 @@
 /*
- * One limit in the popup: its name and percentage, a bar, and when it resets.
+ * One limit in the popup: its name and percentage, a bar with a tick for how
+ * much of its window has gone, and beneath, its pace and when it resets.
  */
 
 import QtQuick
@@ -17,6 +18,10 @@ ColumnLayout {
     // 0 to 1, or negative for no bar at all.
     property real value: 0
     property color barColor: Kirigami.Theme.highlightColor
+    // How much of the window has gone, 0 to 1, or negative for no tick.
+    property real marker: -1
+    property string note
+    property color noteColor: Kirigami.Theme.disabledTextColor
 
     spacing: Kirigami.Units.smallSpacing
 
@@ -55,15 +60,42 @@ ColumnLayout {
             radius: parent.radius
             color: limit.barColor
         }
+
+        Rectangle {
+            visible: limit.marker >= 0
+            x: Math.round(parent.width * Math.min(1, limit.marker)) - width / 2
+            anchors.verticalCenter: parent.verticalCenter
+            width: 2
+            height: parent.height * 2
+            radius: 1
+            color: Kirigami.Theme.textColor
+        }
     }
 
-    PlasmaComponents3.Label {
+    RowLayout {
         Layout.fillWidth: true
-        visible: text !== ""
-        text: limit.subtitle
-        font: Kirigami.Theme.smallFont
-        color: Kirigami.Theme.disabledTextColor
-        elide: Text.ElideRight
-        maximumLineCount: 1
+        visible: limit.note !== "" || limit.subtitle !== ""
+        spacing: Kirigami.Units.smallSpacing * 1.5
+
+        PlasmaComponents3.Label {
+            Layout.fillWidth: true
+            visible: text !== ""
+            text: limit.note
+            font: Kirigami.Theme.smallFont
+            color: limit.noteColor
+            elide: Text.ElideRight
+            maximumLineCount: 1
+        }
+
+        PlasmaComponents3.Label {
+            // On its own, it starts on the left like any other line.
+            Layout.fillWidth: limit.note === ""
+            visible: text !== ""
+            text: limit.subtitle
+            font: Kirigami.Theme.smallFont
+            color: Kirigami.Theme.disabledTextColor
+            elide: Text.ElideRight
+            maximumLineCount: 1
+        }
     }
 }
